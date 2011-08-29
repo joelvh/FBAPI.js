@@ -15,6 +15,7 @@
   var protocol = document.location.protocol,
     facebook_lib_url = protocol + "//connect.facebook.net/en_US/all.js",
     cache = {},
+    regex_remove_pseudo = /\/(profile|object)$/i,
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
     //SOURCE URL: https://developers.facebook.com/docs/reference/api/user/
@@ -318,58 +319,74 @@
     //FBAPI.get(['profile', 'friends', 'checkins'], '1234567', callback)
     // - gets each of the pieces of data for the specified ID
     get: function(names, id, callback) {
-      if (!isArray(names)) {
-        names = [names];
-      }
       //if no id, set to "me"
       if (!id || isFunction(id)) {
         callback = id;
         id = "me";
       }
+      if (!isArray(names)) {
+        return FBAPI.getData("/" + id + "/" + names, callback);
+      }
       var responses = {},
         errors = [],
-        count = names.length;
+        batch = [],
+        names_not_cached = [];
       //call the API for each named function
       each(names, function(index, name) {
         //reserved names "profile" and "object" used to get data by ID,
         //regex removes the name to get data by ID
-        var path = "/" + id + '/' + name,
-          //callback to aggregate response data for batch
-          batchCallback = function(data, error) {
-            //aggregate errors
-            if (error) {
-              errors.push(error);
-            } else {
-              responses[name] = data;
-            }
-            //if the number of responses equals the number of method names, call callback
-            if (!--count && callback) {
-              callback(responses, errors);//orNull(errors, true));
-            }
-          };
-        //use custom callback that aggregates responses, 
-        //otherwise use direct callback if only one request
-        FBAPI.getData(path, (count == 1) ? callback : batchCallback);
+        var path = ("/" + id + '/' + name).replace(regex_remove_pseudo, "");
+        
+        if (cache[path]) {
+          responses[name] = cache[path];
+        } else {
+          batch.push({
+            method: "GET", 
+            relative_url: path
+          });
+          names_not_cached.push(name);
+        }
+      });
+      
+      if (!batch.length) {
+        callback && callback(responses, errors);
+        
+        return FBAPI;
+      }
+      
+      //call Facebook batch API
+      FB.api("/", "POST", { access_token: FB.getAccessToken(), batch: batch }, function(results) {
+        each(results, function(index, result) {
+          result = FB.JSON.parse(result.body);
+          //aggregate errors
+          if (result.error) {
+            errors.push(result.error);
+          } else {
+            responses[names_not_cached[index]] = result.data || result;
+          }
+        });
+
+        callback && callback(responses, errors);
       });
       
       return FBAPI;
     },
     //get FB data and cache responses if not an error
     getData: function(path, callback) {
-      var cached = cache[path],
-       regex = /\/(profile|object)$/i,
-       is_pseudo = regex.test(path),
+      var is_pseudo = regex_remove_pseudo.test(path),
         //callback used to with live or cached response
         proxyCallback = function(response) {
           fireCallbackWithResponseData(callback, response, (is_pseudo) ? true : "data", "error");
         };
+      
+      path = path.replace(regex_remove_pseudo, "");
       //use cached response if possible
-      if (cached) {
-        proxyCallback(cached);
+      if (cache[path]) {
+        proxyCallback(cache[path]);
       } else {
         //get a new response
         promiseFB(function(FB) {
-          FB.api(path.replace(regex, ""), function(response) {
+          FB.api(path, function(response) {
             //if not an error, cache response
             if (!response.error) {
               cache[path] = response;

@@ -4,7 +4,7 @@ FBAPI.js is a Facebook Javascript SDK wrapper that adds many helper functions to
 
 Please look at the FBAPI.js source file to get more details.  
 
-Minified version of FBAPI.js is 3.18KB (1.55KB gzipped).  I'm continuing to reduce the file size.
+Minified version of FBAPI.js is 3.37KB (1.65KB gzipped).  I'm continuing to reduce the file size.
 
 ## Examples
 
