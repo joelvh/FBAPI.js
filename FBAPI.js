@@ -95,10 +95,7 @@
       async: true,
       //tells FBAPI to load facebook API lib async 
       //and defer execution to keep async scripts executing in order
-      defer: false,
-      //a function that accepts the facebook API lib URL 
-      //to load the script using a custom loader (e.g. yepNope.js)
-      loader: null
+      defer: false
     },
     initialized = false,
     fbLoaded = false,
@@ -170,20 +167,15 @@
         document.body.appendChild(fbRoot);
       }
       
-      //load facebook API lib with custom loader
-      if (options.loader) {
-        options.loader(facebook_lib_url);
-      } else {
-        //load facebook API lib
-        var script = document.createElement('SCRIPT');
-        script.async = options.async;
-        script.defer = options.defer;
-        script.src = facebook_lib_url;
-        script.onload = function() {
-          script.parentNode.removeChild(script);
-        };
-        document.getElementsByTagName('HEAD')[0].appendChild(script);
-      }
+      //load facebook API lib
+      var script = document.createElement('SCRIPT');
+      script.async = options.async;
+      script.defer = options.defer;
+      script.src = facebook_lib_url;
+      script.onload = function() {
+        script.parentNode.removeChild(script);
+      };
+      document.getElementsByTagName('HEAD')[0].appendChild(script);
       
       return FBAPI;
     },
@@ -200,7 +192,7 @@
       promiseFB(function(FB) {
         FB.login(function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", ["session", "authResponse"], "error");
+          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         }, (perms) ? {scope: perms} : null);
       });
     },
@@ -208,7 +200,7 @@
       promiseFB(function(FB) {
         FB.logout(function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", ["session", "authResponse"], "error");
+          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         });
       });
     },
@@ -217,7 +209,7 @@
       promiseFB(function(FB) {
         FB.getLoginStatus(function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", ["session", "authResponse"], "error");
+          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         });
       });
     },
@@ -472,38 +464,24 @@
   }
   //pass in a callback, response, and list of properties.
   //the properties are retrieved from the response and passed as parameters to the callback. 
-  //a property can be an array of strings, for which the first property that exists in the response 
-  //is used as the callback parameter value.
   //To pass the whole response as a callback param, pass in the boolean "true" in place of a property name.
   //EXAMPLE:
-  //fireCallbackWithResponseData(callback, response, "status", ["session", "authResponse"])
-  // - the first parameter to the callback will be response.status, 
-  //   and the second parameter will be either response.session or response.authResponse, 
-  //   depending on which is the first one that exists in the response object
+  //fireCallbackWithResponseData(callback, response, "status", "authResponse", "error")
+  // - the parameters to the callback will be response.status, response.authResponse, 
+  //   and response.error
   function fireCallbackWithResponseData(/*callback,response,property1,propery2,...*/) {
     var args = argumentsToArray(arguments),
       callback = args.shift(),
       response = args.shift();
     
-    if (!callback) {
-      return;
-    }
-    //map response property names to arguments
-    each(args, function(index, propertyName) {
-      if (isArray(propertyName)) {
-        //while the property name is not in the response, remove from the array
-        while (propertyName !== true && !(propertyName[0] in response)) {
-          propertyName.shift();
-        }
-        //if there is an array value left, use the first one as the property name
-        args[index] = (!propertyName.length) ? null : (propertyName[0] === true) ? response : response[propertyName[0]];
-      } else {
+    if (callback) {
+      //map response property names to arguments
+      each(args, function(index, propertyName) {
         args[index] = (propertyName === true) ? response : orNull(response[propertyName]);
-      }
-    });
-    console.log("response args", args)
-    //call callback with response data
-    callback.apply(response, args);
+      });
+      //call callback with response data
+      callback.apply(response, args);
+    }
   }
 //create camel case name
   function camelCase(input, capitalizeFirstLetter) {
