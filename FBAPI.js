@@ -501,7 +501,7 @@
     //find non-method characters and remove them, 
     //at the same time capitalizing any trailing alpha characters 
     //to create a camel-case name
-    input.replace(/[^a-z0-9]+(.|$)/ig, function(match, letter, index) {
+    input = input.replace(/[^a-z0-9]+(.|$)/ig, function(match, letter, index) {
       //test to see if the char following non-method name chars 
       //is a letter
       if (/[a-z]/i.test(letter)) {
