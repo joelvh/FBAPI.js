@@ -11,12 +11,12 @@ Minified version of FBAPI.js is 3.18KB (1.55KB gzipped).  I'm continuing to redu
 ### Load FBAPI.js and the Facebook SDK
 
 //Facebook init options
-    var config = {
-     appId: "1234567"
-    };
+> var config = {
+ appId: "1234567"
+};
     
 //FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-root"></div> or loading all.js
-    FBAPI.init(config)
+> FBAPI.init(config)
 
 ### FBAPI.js's "fluid" API
 
