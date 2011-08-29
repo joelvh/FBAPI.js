@@ -470,25 +470,6 @@
     }
     return target;
   }
-  function copy(values) {
-    return extend({}, values);
-  }
-  function removeProperties(target, returnNewObject, attributes) {
-    if (!isArray(attributes)) {
-      attributes = argumentsToArray(arguments);
-      //remove "target" arg
-      attributes.shift();
-      //if "returnNewObject" is a boolean, remove
-      if (returnNewObject === true) {
-        attributes.shift();
-        target = copy(target);
-      }
-    }
-    each(attributes, function(index, attribute) {
-      delete target[attribute];
-    });
-    return target;
-  }
   //pass in a callback, response, and list of properties.
   //the properties are retrieved from the response and passed as parameters to the callback. 
   //a property can be an array of strings, for which the first property that exists in the response 
