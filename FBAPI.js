@@ -100,28 +100,44 @@
     },
     initialized = false,
     fbLoaded = false,
-    //callback saved from FBAPI.init()
-    fbLoadedCallback = null,
-    fbAsyncInitPromises = [],
-    fbAsyncInitCallback = function() {
-      //loop through queue of callbacks
-      while (fbAsyncInitPromises.length) {
-        fbAsyncInitPromises.shift()(FB);
+    //Queue of callbacks to fire once 
+    //Facebook Javascript SDK is loaded
+    promiseQueue = [],
+    //Queues callbacks to be triggered 
+    //once the Facebook Javascript SDK loads. 
+    //Optionally can pass in a method to call on FB 
+    //and forward the callback
+    // - promiseFB('login', function(response) { /*code*/ });
+    //When the method name is not specified, 
+    //the callback is triggered with FB as the only parameter
+    // - promiseFB(function(FB) { /*code*/ })
+    promiseFB = function(methodName) {
+      var callback;
+      //if it's a function, it's a callback that accepts FB as a param
+      if (isFunction(methodName)) {
+        callback = methodName;
+      } else {
+        //remove the first argument (which is methodName)
+        var args = argumentsToArray(arguments);
+        args.shift();
+        //Create a callback that is fired on the specified FB method.
+        callback = function(FB) {
+          //The method could include namespace, such as "Event.subscribe" 
+          //or "FB.Event.subscribe", so we split on "." and navigate through FB.
+          var names = methodName.replace(/^FB\./i, "").split("."),
+            target = FB;
+          //The last name in the namespace is the method name (e.g. "subscribe")
+          methodName = names.pop();
+          //Navigate through remaining namespace
+          each(names, function(index, name) {
+            target = target[name];
+          });
+          //Call the method as if it was called directly.
+          target[methodName].apply(target, args);
+        }
       }
-      fbLoaded = true;
-      //in case some FB.Event.subscribe calls are queued up, 
-      //call fbLoadedCallback() after emptying queue because 
-      //fbLoadedCallback() calls FB.getLoginStatus(), which 
-      //may fire facebook events, which we'd want to notify 
-      //event handlers of.
-      fbLoadedCallback(FB);
-    },
-    //promise to make sure FB exists, queues callback if necessary
-    promiseFB = function(callback) {
-      if (!initialized) {
-        throw "Run FBAPI.init(options) first";
-      } else if (!fbLoaded) {
-        fbAsyncInitPromises.push(callback);
+      if (!fbLoaded) {
+        promiseQueue.push(callback);
       } else {
         callback(FB);
       }
@@ -129,11 +145,10 @@
     
   ////// Init FBAPI //////
   
-  //assign callback for when facebook API lib loads
-  window.fbAsyncInit = fbAsyncInitCallback;
-    
   //FB init configuration info
   var FBAPI = {
+    //Facebook configuration options, along with some FBAPI ones 
+    //which are stored here when FBAPI.init() is called
     config: null,
     // If a callback is specified, FB.getLoginStatus() is called 
     // and the status and auth data is passed back
@@ -144,39 +159,47 @@
         return FBAPI;
       }
       
-      initialized = true;
-      
       //extend options to make sure all properties are present
       FBAPI.config = options = extend(options, defaultOptions);
-      //save callback
-      fbLoadedCallback = function(FB) {
+      
+      //Initialize Facebook's API once the script loads
+      promiseFB('init', options);
+      
+      //set Facebook Javascript SDK callback to fire when 
+      //the script library loads
+      window.fbAsyncInit = function() {
+        //loop through callbacks there were queued 
+        //before Facebook Javascript SDK was loaded
+        while (promiseQueue.length) {
+          promiseQueue.shift()(FB);
+        }
+        
+        fbLoaded = true;
+
         //fire callback and pass session data if there is any
         if (callback) {
           FBAPI.getLoginStatus(callback);
         }
-      };
+      }
       
-      //queue callback for when facebook API lib is loaded
-      promiseFB(function(FB) {
-        FB.init(options);
-      });
-      
-      //facebook's javascript API requires <div id="fb-root"></div> before loading
+      //Facebook's SDK requires <div id="fb-root"></div> before loading
       if (!document.getElementById('fb-root')) {
         var fbRoot = document.createElement('DIV');
         fbRoot.id = 'fb-root';
         document.body.appendChild(fbRoot);
       }
       
-      //load facebook API lib
+      //create script tag to load Facebook Javascript SDK
       var script = document.createElement('SCRIPT');
-      script.async = options.async;
-      script.defer = options.defer;
       script.src = facebook_lib_url;
       script.onload = function() {
         script.parentNode.removeChild(script);
       };
+      options.async && (script.async = true);
+      options.defer && (script.defer = true);
       document.getElementsByTagName('HEAD')[0].appendChild(script);
+      
+      initialized = true;
       
       return FBAPI;
     },
@@ -190,29 +213,26 @@
         callback = perms;
         perms = null;
       }
-      promiseFB(function(FB) {
-        FB.login(function(response) {
+      promiseFB('login', 
+        function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         }, (perms) ? {scope: perms} : null);
-      });
     },
     logout: function(callback) {
-      promiseFB(function(FB) {
-        FB.logout(function(response) {
+      promiseFB('logout', 
+        function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         });
-      });
     },
     //callback(status, session/authResponse, error)
     getLoginStatus: function(callback) {
-      promiseFB(function(FB) {
-        FB.getLoginStatus(function(response) {
+      promiseFB('getLoginStatus', 
+        function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         });
-      });
     },
     //alias for FB.login()
     requestPermission: function(perms, callback) {
@@ -222,9 +242,7 @@
     ////// subscribe/unsubscribe aliases renamed from facebook API ////////
     
     bind: function(eventName, callback) {
-      promiseFB(function(FB) {
-        FB.Event.subscribe(eventName, callback);
-      });
+      promiseFB('Event.subscribe', eventName, callback);
       
       return FBAPI;
     },
@@ -344,6 +362,8 @@
             method: "GET", 
             relative_url: path
           });
+          //Keep track of names that were not cached, 
+          //to construct the result object.
           names_not_cached.push(name);
         }
       });
@@ -354,20 +374,27 @@
         return FBAPI;
       }
       
+      var batchRequest = { 
+        access_token: FB.getAccessToken(), 
+        batch: batch 
+      };
+      
       //call Facebook batch API
-      FB.api("/", "POST", { access_token: FB.getAccessToken(), batch: batch }, function(results) {
-        each(results, function(index, result) {
-          result = FB.JSON.parse(result.body);
-          //aggregate errors
-          if (result.error) {
-            errors.push(result.error);
-          } else {
-            responses[names_not_cached[index]] = result.data || result;
-          }
+      promiseFB("api", "/", "POST", batchRequest, 
+        function(results) {
+          each(results, function(index, result) {
+            //Parse the response body, which is serialized JSON
+            result = FB.JSON.parse(result.body);
+            //aggregate errors
+            if (result.error) {
+              errors.push(result.error);
+            } else {
+              responses[names_not_cached[index]] = result.data || result;
+            }
+          });
+  
+          callback && callback(responses, errors);
         });
-
-        callback && callback(responses, errors);
-      });
       
       return FBAPI;
     },
@@ -385,15 +412,14 @@
         proxyCallback(cache[path]);
       } else {
         //get a new response
-        promiseFB(function(FB) {
-          FB.api(path, function(response) {
+        promiseFB('api', path, 
+          function(response) {
             //if not an error, cache response
             if (!response.error) {
               cache[path] = response;
             }
             proxyCallback(response);
           });
-        });
       }
       
       return FBAPI;
