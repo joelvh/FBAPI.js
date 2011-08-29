@@ -12,9 +12,8 @@
   
   ////// Globals //////
   
-  var protocol = document.location.protocol,
-    facebook_lib_url = protocol + "//connect.facebook.net/en_US/all.js",
-    cache = {},
+  var facebook_lib_url = document.location.protocol + "//connect.facebook.net/en_US/all.js",
+    responseCache = {},
     regex_remove_pseudo = /\/(profile|object)$/i,
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
@@ -355,8 +354,8 @@
         //regex removes the name to get data by ID
         var path = ("/" + id + '/' + name).replace(regex_remove_pseudo, "");
         
-        if (cache[path]) {
-          responses[name] = cache[path];
+        if (responseCache[path]) {
+          responses[name] = responseCache[path];
         } else {
           batch.push({
             method: "GET", 
@@ -408,15 +407,15 @@
       
       path = path.replace(regex_remove_pseudo, "");
       //use cached response if possible
-      if (cache[path]) {
-        proxyCallback(cache[path]);
+      if (responseCache[path]) {
+        proxyCallback(responseCache[path]);
       } else {
         //get a new response
         promiseFB('api', path, 
           function(response) {
             //if not an error, cache response
             if (!response.error) {
-              cache[path] = response;
+              responseCache[path] = response;
             }
             proxyCallback(response);
           });
