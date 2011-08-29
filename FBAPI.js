@@ -298,7 +298,9 @@
           if (returnWaitable) {
             callback(waitable);
           } else {
-            waitable.wait(callback);
+            waitable.wait(function() {
+              callback(waitable.value);
+            });
           }
 	      }
 	    });
