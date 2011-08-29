@@ -10,26 +10,28 @@ Minified version of FBAPI.js is 3.18KB (1.55KB gzipped).  I'm continuing to redu
 
 ### Load FBAPI.js and the Facebook SDK
 
-//Facebook init options
+Facebook init options  
+
 > var config = {
- appId: "1234567"
-};
+>   appId: "1234567"
+> };
     
-//FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-root"></div> or loading all.js
+FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-root"></div> or loading all.js  
+
 > FBAPI.init(config)
 
 ### FBAPI.js's "fluid" API
 
-//FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kinda like "promises").
+FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kinda like "promises").
 
-  //The first parameter is optional and can contain a comma-separated list of permissions.
-  //The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()
-  .login("email,perm2,perm3", function(status, authResponse, error) {
-    //Facebook API responses are parsed into callback parameters
-    if (!error) {
-      //do something
-    }
-  })
+>  //The first parameter is optional and can contain a comma-separated list of permissions.  
+>  //The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()
+>  .login("email,perm2,perm3", function(status, authResponse, error) {
+>    //Facebook API responses are parsed into callback parameters
+>    if (!error) {
+>      //do something
+>    }
+>  })
 
 //One of the things that FBAPI.js does is create helper methods to subscribe to events.  They mimic 
 //the original event name, except for the "auth" events are not prefixed with "auth".
