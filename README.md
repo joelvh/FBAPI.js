@@ -24,8 +24,9 @@ FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-roo
 
 FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kinda like "promises").
 
->  //The first parameter is optional and can contain a comma-separated list of permissions.  
->  //The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()
+The first parameter is optional and can contain a comma-separated list of permissions.  
+The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()  
+
 >  .login("email,perm2,perm3", function(status, authResponse, error) {
 >    //Facebook API responses are parsed into callback parameters
 >    if (!error) {
@@ -33,84 +34,86 @@ FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kind
 >    }
 >  })
 
-//One of the things that FBAPI.js does is create helper methods to subscribe to events.  They mimic 
-//the original event name, except for the "auth" events are not prefixed with "auth".
+One of the things that FBAPI.js does is create helper methods to subscribe to events.  They mimic 
+the original event name, except for the "auth" events are not prefixed with "auth".
 
-  .onStatusChange(function(response) {
-    //handle response for "auth.statusChange" event
-  })
-  .onCommentCreate(function() {
-    //handle response for "comment.create" event
-  })
+>  .onStatusChange(function(response) {
+>    //handle response for "auth.statusChange" event
+>  })
+>  .onCommentCreate(function() {
+>    //handle response for "comment.create" event
+>  })
   
-//FBAPI.js also adds helper methods for profiles, objects, and connections. 
-//Facebook API responses are broken into callback parameters.
+FBAPI.js also adds helper methods for profiles, objects, and connections.  
+Facebook API responses are broken into callback parameters.
 
-  //FBAPI.getProfile(callback) gets the data for the current user (e.g. FB.api('/me', callback))
-  .getProfile(function(data, error) {
-    if (!error) {
-      //do something with the data
-    }
-  })
+>  //FBAPI.getProfile(callback) gets the data for the current user (e.g. FB.api('/me', callback))
+>  .getProfile(function(data, error) {
+>    if (!error) {
+>      //do something with the data
+>    }
+>  })  
   
-  //FBAPI.getProfile(id, callback) gets the data for the specific user (e.g. FB.api('/1234567', callback))
-  .getProfile('1234567', function(data, error) {
-    if (!error) {
-      //do something with the data
-    }
-  })
+>  //FBAPI.getProfile(id, callback) gets the data for the specific user (e.g. FB.api('/1234567', callback))
+>  .getProfile('1234567', function(data, error) {
+>    if (!error) {
+>      //do something with the data
+>    }
+>  })  
   
-  //FBAPI.getObject(id, callback) gets the data for any object.  
-  //It's basically an alias to FBAPI.getProfile, but makes it easier to read when getting a page or object 
-  //other than a user.
-  .getObject('1234567', function(data, error) {
-    if (!error) {
-      //do something with the data
-    }
-  })
+>  //FBAPI.getObject(id, callback) gets the data for any object.  
+>  //It's basically an alias to FBAPI.getProfile, but makes it easier to read when getting a page or object 
+>  //other than a user.
+>  .getObject('1234567', function(data, error) {
+>    if (!error) {
+>      //do something with the data
+>    }
+>  })  
   
-  //Batching is possible by passing an array of connections to retrieve, (which can include "profile" as well).
-  .get(["profile", "friends", "checkins"], '1234567', function(results, errors) {
-    //"errors" is an array of error responses
-    if (!errors.length) {
-      //"results" is a map of results for each connection specified
-      console.log(results.profile, results.friends, results.checkins);
-    }
-  });
+>  //Batching is possible by passing an array of connections to retrieve, (which can include "profile" as well).
+>  .get(["profile", "friends", "checkins"], '1234567', function(results, errors) {
+>    //"errors" is an array of error responses
+>    if (!errors.length) {
+>      //"results" is a map of results for each connection specified
+>      console.log(results.profile, results.friends, results.checkins);
+>    }
+>  });
   
 
 ### Binding events
 
-//Binding events is done through aliases to FB.Event.subscribe() and FB.Event.unsubscribe().
+Binding events is done through aliases to FB.Event.subscribe() and FB.Event.unsubscribe().
 
-FBAPI.bind(eventName, callback);
-FBAPI.unbind(eventName, callback);
+> FBAPI.bind(eventName, callback);
+> FBAPI.unbind(eventName, callback);
 
 ### FQL queries
 
-//FQL queries can be done individually or as a batch.
+FQL queries can be done individually or as a batch.
 
-//The second parameter "params" is not required.  The callback receives the results.
-//It is possible to get the watchable object back instead of executing the query 
-//by passing a boolean value of "true" as the fourth parameter.
-FBAPI.query("SELECT birthday FROM user WHERE uid = {0}", ["me()"], function(results) {
-  //do something with results
-});
+The second parameter "params" is not required.  The callback receives the results. 
+It is possible to get the watchable object back instead of executing the query 
+by passing a boolean value of "true" as the fourth parameter.
 
-//Batching queries requires a named map.  The "params" property is not required. 
-//It is possible to get the watchable object back instead of executing the query 
-//by passing a boolean value of "true" as the third parameter.
-var queries = {
-  "friends": {
-    query: "SELECT name FROM friend WHERE uid1 = {0}",
-    params: ["me()"]
-  },
-  "checkins": {
-    query: "SELECT coords FROM checkin WHERE author_id = {0}",
-    params: ["me()"]
-  },
-};
-FBAPI.query(queries, function(resultMap) {
-  //do something with the data
-  console.log(resultMap.friends, resultMap.checkins);
-});
+> FBAPI.query("SELECT birthday FROM user WHERE uid = {0}", ["me()"], function(results) {
+>   //do something with results
+> });
+
+Batching queries requires a named map.  The "params" property is not required.  
+It is possible to get the watchable object back instead of executing the query 
+by passing a boolean value of "true" as the third parameter.
+
+> var queries = {
+>   "friends": {
+>     query: "SELECT name FROM friend WHERE uid1 = {0}",
+>     params: ["me()"]
+>   },
+>   "checkins": {
+>     query: "SELECT coords FROM checkin WHERE author_id = {0}",
+>     params: ["me()"]
+>   },
+> };
+> FBAPI.query(queries, function(resultMap) {
+>   //do something with the data
+>   console.log(resultMap.friends, resultMap.checkins);
+> });
