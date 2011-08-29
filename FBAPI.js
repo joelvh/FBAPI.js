@@ -134,30 +134,30 @@
   //assign callback for when facebook API lib loads
   window.fbAsyncInit = fbAsyncInitCallback;
     
-	//FB init configuration info
-	var FBAPI = {
-	  config: null,
-	  // If a callback is specified, FB.getLoginStatus() is called 
-	  // and the status and auth data is passed back
-	  // - options = { appId, apiKey, perms }
-	  // - callback = function(status, authResponse) { /*callback code*/ }
-		init: function (options, callback) {
-		  if (initialized) {
-		    return FBAPI;
-		  }
+  //FB init configuration info
+  var FBAPI = {
+    config: null,
+    // If a callback is specified, FB.getLoginStatus() is called 
+    // and the status and auth data is passed back
+    // - options = { appId, apiKey, perms }
+    // - callback = function(status, authResponse) { /*callback code*/ }
+    init: function (options, callback) {
+      if (initialized) {
+        return FBAPI;
+      }
       
       initialized = true;
-		  
-		  //extend options to make sure all properties are present
-		  FBAPI.config = options = extend(options, defaultOptions);
-		  //save callback
-		  fbLoadedCallback = function(FB) {
+      
+      //extend options to make sure all properties are present
+      FBAPI.config = options = extend(options, defaultOptions);
+      //save callback
+      fbLoadedCallback = function(FB) {
         //fire callback and pass session data if there is any
         if (callback) {
           FBAPI.getLoginStatus(callback);
         }
-		  };
-		  
+      };
+      
       //queue callback for when facebook API lib is loaded
       promiseFB(function(FB) {
         FB.init(options);
@@ -186,12 +186,12 @@
       }
       
       return FBAPI;
-		},
-		
-		////// auth functions ///////
-		
-		//Optionally pass in a comma-separated list of extended permissions.
-		//Callback is passed these params: callback(status, session/authResponse, error)
+    },
+    
+    ////// auth functions ///////
+    
+    //Optionally pass in a comma-separated list of extended permissions.
+    //Callback is passed these params: callback(status, session/authResponse, error)
     login: function(perms/*aka perms*/, callback) {
       if (isFunction(perms)) {
         callback = perms;
@@ -213,19 +213,19 @@
       });
     },
     //callback(status, session/authResponse, error)
-		getLoginStatus: function(callback) {
+    getLoginStatus: function(callback) {
       promiseFB(function(FB) {
         FB.getLoginStatus(function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", ["session", "authResponse"], "error");
         });
       });
-		},
-		//alias for FB.login()
-		requestPermission: function(perms, callback) {
-		  FBAPI.login(perms, callback);
-		},
-		
+    },
+    //alias for FB.login()
+    requestPermission: function(perms, callback) {
+      FBAPI.login(perms, callback);
+    },
+    
     ////// subscribe/unsubscribe aliases renamed from facebook API ////////
     
     bind: function(eventName, callback) {
@@ -251,37 +251,37 @@
       return FBAPI;
     },
     
-	  ////// Data requests to facebook API ///////
-	  
-	  //A single query can specify optional params:
-	  // - FBAPI.query("SELECT col FROM table WHERE uid = {0}", ["me()"], callback)
-	  //"returnWaitable" will fire the callback with the facebook waitable object as a param, 
-	  //otherwise the callback receives the queried data.
-	  //Multiple queries can be specified by a map, and not specifying the "params" arg:
-	  // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*...*/ }
-	  //"returnWaitable" will fire the callback with a map of the facebook waitable objects as a param,
-	  //otherwise the callback receives the queried data as a map.
-	  //EXAMPLE: data passed to callback
-	  // - { friends: /*results*/, checkins: /*results*/ }
-	  //EXAMPLE: waitables passed to callback
-	  // - { friends: /*waitable*/, checkins: /*waitable*/ }
-	  query: function(query, params, callback, returnWaitable) {
-	    if (isFunction(params)) {
+    ////// Data requests to facebook API ///////
+    
+    //A single query can specify optional params:
+    // - FBAPI.query("SELECT col FROM table WHERE uid = {0}", ["me()"], callback)
+    //"returnWaitable" will fire the callback with the facebook waitable object as a param, 
+    //otherwise the callback receives the queried data.
+    //Multiple queries can be specified by a map, and not specifying the "params" arg:
+    // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*...*/ }
+    //"returnWaitable" will fire the callback with a map of the facebook waitable objects as a param,
+    //otherwise the callback receives the queried data as a map.
+    //EXAMPLE: data passed to callback
+    // - { friends: /*results*/, checkins: /*results*/ }
+    //EXAMPLE: waitables passed to callback
+    // - { friends: /*waitable*/, checkins: /*waitable*/ }
+    query: function(query, params, callback, returnWaitable) {
+      if (isFunction(params)) {
         returnWaitable = callback;
-	      callback = params;
-	      params = null;
-	    }
-	    promiseFB(function(FB) {
-	      if (isObject(query)) {
-	        var waitables = [],
-	         waitableMap = {};
-	        for (var name in queries) {
-	          var item = queries[name],
-	           waitable = FB.Data.query(item.query, item.params);
-	           
-	          waitables.push(waitable);
-	          waitableMap[name] = waitable;
-	        }
+        callback = params;
+        params = null;
+      }
+      promiseFB(function(FB) {
+        if (isObject(query)) {
+          var waitables = [],
+           waitableMap = {};
+          for (var name in queries) {
+            var item = queries[name],
+             waitable = FB.Data.query(item.query, item.params);
+             
+            waitables.push(waitable);
+            waitableMap[name] = waitable;
+          }
           if (returnWaitable) {
             callback(waitableMap);
           } else {
@@ -292,7 +292,7 @@
               callback(waitableMap);
             });
           }
-	      } else {
+        } else {
           var waitable = FB.Data.query(query);
           
           if (returnWaitable) {
@@ -302,101 +302,101 @@
               callback(waitable.value);
             });
           }
-	      }
-	    });
-	  },
-	  //Batch requests:
-		//if one name is specified, returns the data or error object, e.g. callback(data, error)
-		//returns an object map of responses if a batch, where each property of the first callback argument
-		//is the name of the function called and the value is the data that would be returned for a single request...
-		//in a batch, errors are aggregated into an array as the second callback argument
-		//EXAMPLES:
-		//FBAPI.get('profile', function(data, error) { /*callback code*/ })
-		// - gets the profile for "me" (currently logged-in user), data is NULL if there was an error
-		//FBAPI.get('profile', 'username', callback)
-		// - gets the profile for the specified username (the 'profile' parameter is optional when getting a profile)
-		//FBAPI.get('object', '1234567', callback)
-		// - gets the object specified by the ID
-		//FBAPI.get('1234567', callback)
-		// - gets the object specified by the ID (can be a profile or other object)
-		//FBAPI.get(['profile', 'friends', 'checkins'], function(dataMap, errorArray) { /*callback code*/ })
-		// - dataMap = { profile: /*data*/, friends: /*data*/, checkins: /*data*/ }
-		// - errorArray = [ profileError, friendsError, checkinsError ]
-		// - gets each of the pieces of data for "me", callback receives a map of data and array of errors
-		//FBAPI.get(['profile', 'friends', 'checkins'], '1234567', callback)
-		// - gets each of the pieces of data for the specified ID
-		get: function(names, id, callback) {
-			if (!isArray(names)) {
-				names = [names];
-			}
-			//if no id, set to "me"
-			if (!id || isFunction(id)) {
-				callback = id;
-				id = "me";
-			}
-			var responses = {},
-				errors = [],
-				count = names.length;
-			//call the API for each named function
-			each(names, function(index, name) {
-				//reserved names "profile" and "object" used to get data by ID,
-				//regex removes the name to get data by ID
-				var path = "/" + id + '/' + name,
-				  //callback to aggregate response data for batch
-					batchCallback = function(data, error) {
-						//aggregate errors
-						if (error) {
-							errors.push(error);
-						} else {
-							responses[name] = data;
-						}
-						//if the number of responses equals the number of method names, call callback
-						if (!--count && callback) {
-							callback(responses, errors);//orNull(errors, true));
-						}
-					};
-				//use custom callback that aggregates responses, 
-				//otherwise use direct callback if only one request
-				FBAPI.getData(path, (count == 1) ? callback : batchCallback);
-			});
-			
-			return FBAPI;
-		},
-		//get FB data and cache responses if not an error
-		getData: function(path, callback) {
-			var cached = cache[path],
-			 regex = /\/(profile|object)$/i,
-			 is_object = regex.test(path),
-				//callback used to with live or cached response
-				proxyCallback = function(response) {
-				  if (is_object) {
+        }
+      });
+    },
+    //Batch requests:
+    //if one name is specified, returns the data or error object, e.g. callback(data, error)
+    //returns an object map of responses if a batch, where each property of the first callback argument
+    //is the name of the function called and the value is the data that would be returned for a single request...
+    //in a batch, errors are aggregated into an array as the second callback argument
+    //EXAMPLES:
+    //FBAPI.get('profile', function(data, error) { /*callback code*/ })
+    // - gets the profile for "me" (currently logged-in user), data is NULL if there was an error
+    //FBAPI.get('profile', 'username', callback)
+    // - gets the profile for the specified username (the 'profile' parameter is optional when getting a profile)
+    //FBAPI.get('object', '1234567', callback)
+    // - gets the object specified by the ID
+    //FBAPI.get('1234567', callback)
+    // - gets the object specified by the ID (can be a profile or other object)
+    //FBAPI.get(['profile', 'friends', 'checkins'], function(dataMap, errorArray) { /*callback code*/ })
+    // - dataMap = { profile: /*data*/, friends: /*data*/, checkins: /*data*/ }
+    // - errorArray = [ profileError, friendsError, checkinsError ]
+    // - gets each of the pieces of data for "me", callback receives a map of data and array of errors
+    //FBAPI.get(['profile', 'friends', 'checkins'], '1234567', callback)
+    // - gets each of the pieces of data for the specified ID
+    get: function(names, id, callback) {
+      if (!isArray(names)) {
+        names = [names];
+      }
+      //if no id, set to "me"
+      if (!id || isFunction(id)) {
+        callback = id;
+        id = "me";
+      }
+      var responses = {},
+        errors = [],
+        count = names.length;
+      //call the API for each named function
+      each(names, function(index, name) {
+        //reserved names "profile" and "object" used to get data by ID,
+        //regex removes the name to get data by ID
+        var path = "/" + id + '/' + name,
+          //callback to aggregate response data for batch
+          batchCallback = function(data, error) {
+            //aggregate errors
+            if (error) {
+              errors.push(error);
+            } else {
+              responses[name] = data;
+            }
+            //if the number of responses equals the number of method names, call callback
+            if (!--count && callback) {
+              callback(responses, errors);//orNull(errors, true));
+            }
+          };
+        //use custom callback that aggregates responses, 
+        //otherwise use direct callback if only one request
+        FBAPI.getData(path, (count == 1) ? callback : batchCallback);
+      });
+      
+      return FBAPI;
+    },
+    //get FB data and cache responses if not an error
+    getData: function(path, callback) {
+      var cached = cache[path],
+       regex = /\/(profile|object)$/i,
+       is_object = regex.test(path),
+        //callback used to with live or cached response
+        proxyCallback = function(response) {
+          if (is_object) {
             fireCallbackWithResponseData(callback, response, true, "error");
-				  } else {
-  				  fireCallbackWithResponseData(callback, response, "data", "error");
-  				}
-				};
-			//use cached response if possible
-			if (cached) {
-				proxyCallback(cached);
-			} else {
-				//get a new response
-				promiseFB(function(FB) {
-  				FB.api(path.replace(regex, ""), function(response) {
-  					//if not an error, cache response
-  					if (!response.error) {
-  						cache[path] = response;
-  					}
-  					proxyCallback(response);
-  				});
-				});
-			}
-			
-			return FBAPI;
-		}
-	};
-	
-	////// Generate helper methods on FBAPI ////////
-	
+          } else {
+            fireCallbackWithResponseData(callback, response, "data", "error");
+          }
+        };
+      //use cached response if possible
+      if (cached) {
+        proxyCallback(cached);
+      } else {
+        //get a new response
+        promiseFB(function(FB) {
+          FB.api(path.replace(regex, ""), function(response) {
+            //if not an error, cache response
+            if (!response.error) {
+              cache[path] = response;
+            }
+            proxyCallback(response);
+          });
+        });
+      }
+      
+      return FBAPI;
+    }
+  };
+  
+  ////// Generate helper methods on FBAPI ////////
+  
   //Generates methods on FBAPI like FBAPI.getFriends(id, callback)
   each(facebook_connection_types, function(index, name) {
     FBAPI["get" + camelCase(name, true)] = function(id, callback) {
@@ -416,9 +416,9 @@
   
   
   window.FBAPI = FBAPI;
-	
-	///// Helper functions /////
-	
+  
+  ///// Helper functions /////
+  
 
   //each loop
   function each(items, callback) {
