@@ -18,7 +18,9 @@ Facebook init options
     
 FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-root"></div> or loading all.js  
 
-> FBAPI.init(config)
+> FBAPI.init(config, function() {  
+>     //this is a callback that fires when the Facebook SDK is loaded  
+> })  
 
 ### Session data
 
