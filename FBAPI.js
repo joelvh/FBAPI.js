@@ -358,14 +358,10 @@
     getData: function(path, callback) {
       var cached = cache[path],
        regex = /\/(profile|object)$/i,
-       is_object = regex.test(path),
+       is_pseudo = regex.test(path),
         //callback used to with live or cached response
         proxyCallback = function(response) {
-          if (is_object) {
-            fireCallbackWithResponseData(callback, response, true, "error");
-          } else {
-            fireCallbackWithResponseData(callback, response, "data", "error");
-          }
+          fireCallbackWithResponseData(callback, response, (is_pseudo) ? true : "data", "error");
         };
       //use cached response if possible
       if (cached) {
