@@ -20,35 +20,27 @@ FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-roo
 
 > FBAPI.init(config)
 
-### FBAPI.js's "fluid" API
+### Session data
 
 FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kinda like "promises").
 
 The first parameter is optional and can contain a comma-separated list of permissions.  
 The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()  
 
->  .login("email,perm2,perm3", function(status, authResponse, error) {  
+>  FBAPI.login("email,perm2,perm3", function(status, authResponse, error) {  
 >      //Facebook API responses are parsed into callback parameters  
 >      if (!error) {  
 >          //do something  
 >      }  
 >  })  
 
-One of the things that FBAPI.js does is create helper methods to subscribe to events.  They mimic 
-the original event name, except for the "auth" events are not prefixed with "auth".
+### Get data
 
->  .onStatusChange(function(response) {   
->      //handle response for "auth.statusChange" event  
->  })  
->  .onCommentCreate(function() {  
->      //handle response for "comment.create" event  
->  })  
-  
 FBAPI.js also adds helper methods for profiles, objects, and connections.  
 Facebook API responses are broken into callback parameters.
 
 >  //FBAPI.getProfile(callback) gets the data for the current user (e.g. FB.api('/me', callback))  
->  .getProfile(function(data, error) {  
+>  FBAPI.getProfile(function(data, error) {  
 >      if (!error) {  
 >          //do something with the data  
 >      }  
@@ -87,6 +79,16 @@ Binding events is done through aliases to FB.Event.subscribe() and FB.Event.unsu
 > FBAPI.bind(eventName, callback);  
 > FBAPI.unbind(eventName, callback);  
 
+One of the things that FBAPI.js does is create helper methods to subscribe to events.  They mimic 
+the original event name, except for the "auth" events are not prefixed with "auth".
+
+>  FBAPI.onStatusChange(function(response) {   
+>      //handle response for "auth.statusChange" event  
+>  })  
+>  .onCommentCreate(function() {  
+>      //handle response for "comment.create" event  
+>  })  
+  
 ### FQL queries
 
 FQL queries can be done individually or as a batch.
