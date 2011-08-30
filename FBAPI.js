@@ -101,6 +101,37 @@
     //Facebook Javascript SDK is loaded
     sdkQueue = [],
     sdkLoaded = false,
+    sdk = function(methodName) {
+      var callback;
+      //if it's a function, it's a callback that accepts FB as a param
+      if (isFunction(methodName)) {
+        callback = methodName;
+      } else {
+        //remove the first argument (which is methodName)
+        var args = argumentsToArray(arguments);
+        args.shift();
+        //Create a callback that is fired on the specified FB method.
+        callback = function(FB) {
+          //The method could include namespace, such as "Event.subscribe" 
+          //or "FB.Event.subscribe", so we split on "." and navigate through FB.
+          var names = methodName.replace(/^FB\./i, "").split("."),
+            target = FB;
+          //The last name in the namespace is the method name (e.g. "subscribe")
+          methodName = names.pop();
+          //Navigate through remaining namespace
+          each(names, function(index, name) {
+            target = target[name];
+          });
+          //Call the method as if it was called directly.
+          target[methodName].apply(target, args);
+        }
+      }
+      if (!sdkLoaded) {
+        sdkQueue.push(callback);
+      } else {
+        callback(FB);
+      }
+    },
     initialized = false;
     
   ////// Init FBAPI //////
@@ -168,36 +199,22 @@
     //When the method name is not specified, 
     //the callback is triggered with FB as the only parameter
     // - sdk(function(FB) { /*code*/ })
-    sdk: function(methodName) {
-      var callback;
-      //if it's a function, it's a callback that accepts FB as a param
-      if (isFunction(methodName)) {
-        callback = methodName;
-      } else {
-        //remove the first argument (which is methodName)
-        var args = argumentsToArray(arguments);
-        args.shift();
-        //Create a callback that is fired on the specified FB method.
-        callback = function(FB) {
-          //The method could include namespace, such as "Event.subscribe" 
-          //or "FB.Event.subscribe", so we split on "." and navigate through FB.
-          var names = methodName.replace(/^FB\./i, "").split("."),
-            target = FB;
-          //The last name in the namespace is the method name (e.g. "subscribe")
-          methodName = names.pop();
-          //Navigate through remaining namespace
-          each(names, function(index, name) {
-            target = target[name];
-          });
-          //Call the method as if it was called directly.
-          target[methodName].apply(target, args);
-        }
-      }
-      if (!sdkLoaded) {
-        sdkQueue.push(callback);
-      } else {
-        callback(FB);
-      }
+    sdk: sdk,
+    //Allows you to chain multiple callbacks together. 
+    //The first parameter for each callback is the "next" function 
+    //that allows you to pass arguments to the next function.
+    //Pass each function that should be a part of the chain 
+    //as a parameter to chain.
+    chain: function () {
+      var steps = Array.prototype.slice.call(arguments),
+        next = function() {
+          var args = Array.prototype.slice.call(arguments),
+            step = steps.shift();
+          args.unshift(next);
+          step.apply(this, args);
+        };
+        
+      next();
     },
     
     ////// auth functions ///////
