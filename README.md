@@ -1,6 +1,8 @@
-# FBAPI.js simplifies the Facebook Javascript SDK API
+# FBAPI.js simplifies the Facebook Javascript API
 
-FBAPI.js is a Facebook Javascript SDK wrapper that adds many helper functions to access the Facebook API more easily.
+FBAPI.js is a library that adds many helper functions to access the Facebook API more easily. 
+It takes care of loading the Facebook Javascript SDK for you, and lets you access the API without worrying if everything is ready in the background. 
+API calls and event subscribing are queued up and fired once the SDK is loaded and initialized (using promises). 
 
 Please look at the FBAPI.js [source](https://raw.github.com/joelvh/FBAPI.js/master/FBAPI.js) file to get more details.  
 
