@@ -13,6 +13,7 @@
   ////// Globals //////
   
   var facebook_lib_url = document.location.protocol + "//connect.facebook.net/en_US/all.js",
+    facebook_lib_script = document.createElement('SCRIPT')
     responseCache = {},
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
@@ -96,20 +97,78 @@
       //and defer execution to keep async scripts executing in order
       defer: false
     },
-    initialized = false,
-    fbLoaded = false,
     //Queue of callbacks to fire once 
     //Facebook Javascript SDK is loaded
-    promiseQueue = [],
-    //Queues callbacks to be triggered 
-    //once the Facebook Javascript SDK loads. 
-    //Optionally can pass in a method to call on FB 
-    //and forward the callback
-    // - promiseFB('login', function(response) { /*code*/ });
+    sdkQueue = [],
+    sdkLoaded = false,
+    initialized = false;
+    
+  ////// Init FBAPI //////
+  
+  //FB init configuration info
+  var FBAPI = {
+    //Facebook configuration options, along with some FBAPI ones 
+    //which are stored here when FBAPI.init() is called
+    config: null,
+    // If a callback is specified, FB.getLoginStatus() is called 
+    // and the status and auth data is passed back
+    // - options = { appId, apiKey, perms }
+    // - callback = function(status, authResponse) { /*callback code*/ }
+    init: function (options, callback) {
+      if (initialized) {
+        return FBAPI;
+      }
+      
+      //extend options to make sure all properties are present
+      FBAPI.config = options = extend(options, defaultOptions);
+      
+      //set Facebook Javascript SDK callback to fire when 
+      //the script library loads
+      window.fbAsyncInit = function() {
+        //remove script tag
+        facebook_lib_script.parentNode.removeChild(facebook_lib_script);
+        
+        //initialize Facebook Javascript SDK
+        FB.init(options);
+        
+        //loop through callbacks there were queued 
+        //before Facebook Javascript SDK was loaded
+        while (sdkQueue.length) {
+          sdkQueue.shift()(FB);
+        }
+        
+        sdkLoaded = true;
+
+        //fire callback and pass session data if there is any
+        if (callback) {
+          FBAPI.getLoginStatus(callback);
+        }
+      }
+      
+      //Facebook's SDK requires <div id="fb-root"></div> before loading
+      if (!document.getElementById('fb-root')) {
+        var fbRoot = document.createElement('DIV');
+        fbRoot.id = 'fb-root';
+        document.body.appendChild(fbRoot);
+      }
+      
+      //create script tag to load Facebook Javascript SDK
+      facebook_lib_script.src = facebook_lib_url;
+      options.async && (facebook_lib_script.async = true);
+      options.defer && (facebook_lib_script.defer = true);
+      document.getElementsByTagName('HEAD')[0].appendChild(facebook_lib_script);
+      
+      initialized = true;
+      
+      return FBAPI;
+    },
+    //Queues callbacks to be triggered once the Facebook Javascript SDK loads. 
+    //Optionally can pass in a method to call on FB and forward the callback
+    // - sdk('login', function(response) { /*code*/ });
     //When the method name is not specified, 
     //the callback is triggered with FB as the only parameter
-    // - promiseFB(function(FB) { /*code*/ })
-    promiseFB = function(methodName) {
+    // - sdk(function(FB) { /*code*/ })
+    sdk: function(methodName) {
       var callback;
       //if it's a function, it's a callback that accepts FB as a param
       if (isFunction(methodName)) {
@@ -134,72 +193,11 @@
           target[methodName].apply(target, args);
         }
       }
-      if (!fbLoaded) {
-        promiseQueue.push(callback);
+      if (!sdkLoaded) {
+        sdkQueue.push(callback);
       } else {
         callback(FB);
       }
-    };
-    
-  ////// Init FBAPI //////
-  
-  //FB init configuration info
-  var FBAPI = {
-    //Facebook configuration options, along with some FBAPI ones 
-    //which are stored here when FBAPI.init() is called
-    config: null,
-    // If a callback is specified, FB.getLoginStatus() is called 
-    // and the status and auth data is passed back
-    // - options = { appId, apiKey, perms }
-    // - callback = function(status, authResponse) { /*callback code*/ }
-    init: function (options, callback) {
-      if (initialized) {
-        return FBAPI;
-      }
-      
-      //extend options to make sure all properties are present
-      FBAPI.config = options = extend(options, defaultOptions);
-      
-      //Initialize Facebook's API once the script loads
-      promiseFB('init', options);
-      
-      //set Facebook Javascript SDK callback to fire when 
-      //the script library loads
-      window.fbAsyncInit = function() {
-        //loop through callbacks there were queued 
-        //before Facebook Javascript SDK was loaded
-        while (promiseQueue.length) {
-          promiseQueue.shift()(FB);
-        }
-        
-        fbLoaded = true;
-
-        //fire callback and pass session data if there is any
-        if (callback) {
-          FBAPI.getLoginStatus(callback);
-        }
-      }
-      
-      //Facebook's SDK requires <div id="fb-root"></div> before loading
-      if (!document.getElementById('fb-root')) {
-        var fbRoot = document.createElement('DIV');
-        fbRoot.id = 'fb-root';
-        document.body.appendChild(fbRoot);
-      }
-      
-      //create script tag to load Facebook Javascript SDK
-      var script = document.createElement('SCRIPT');
-      script.src = facebook_lib_url;
-      script.onload = function() {
-        script.parentNode.removeChild(script);
-      };
-      options.async && (script.async = true);
-      options.defer && (script.defer = true);
-      document.getElementsByTagName('HEAD')[0].appendChild(script);
-      
-      initialized = true;
-      
-      return FBAPI;
     },
     
     ////// auth functions ///////
@@ -211,14 +209,14 @@
         callback = perms;
         perms = null;
       }
-      promiseFB('login', 
+      sdk('login', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         }, (perms) ? {scope: perms} : null);
     },
     logout: function(callback) {
-      promiseFB('logout', 
+      sdk('logout', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
@@ -226,7 +224,7 @@
     },
     //callback(status, session/authResponse, error)
     getLoginStatus: function(callback) {
-      promiseFB('getLoginStatus', 
+      sdk('getLoginStatus', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
@@ -240,12 +238,12 @@
     ////// subscribe/unsubscribe aliases renamed from facebook API ////////
     
     bind: function(eventName, callback) {
-      promiseFB('Event.subscribe', eventName, callback);
+      sdk('Event.subscribe', eventName, callback);
       
       return FBAPI;
     },
     unbind: function(eventName, callback) {
-      promiseFB(function(FB) {
+      sdk(function(FB) {
         if (eventName) {
           FB.Event.unsubscribe(eventName, callback);
         } else {
@@ -280,7 +278,7 @@
         callback = params;
         params = null;
       }
-      promiseFB(function(FB) {
+      sdk(function(FB) {
         if (isObject(query)) {
           var waitables = [],
            waitableMap = {};
@@ -378,7 +376,7 @@
       };
       
       //call Facebook batch API
-      promiseFB("api", "/", "POST", batchRequest, 
+      sdk("api", "/", "POST", batchRequest, 
         function(results) {
           each(results, function(index, result) {
             //Parse the response body, which is serialized JSON
@@ -409,7 +407,7 @@
         proxyCallback(responseCache[path]);
       } else {
         //get a new response
-        promiseFB('api', path, 
+        sdk('api', path, 
           function(response) {
             //if not an error, cache response
             if (!response.error) {
