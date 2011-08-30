@@ -18,7 +18,8 @@ Facebook init options
          appId: "1234567"  
      };  
     
-FBAPI.js loads the Facebook SDK internally for you.  No need for <div id="fb-root"></div> or loading all.js  
+FBAPI.js loads the Facebook SDK internally for you. 
+No need for adding the "fb-root" DIV tag required by the SDK or loading the [all.js](http://connect.facebook.net/en_US/all.js) library.  
 
      FBAPI.init(config, function() {  
          //this is a callback that fires when the Facebook SDK is loaded  
