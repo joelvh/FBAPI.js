@@ -539,14 +539,12 @@
     //find non-method characters and remove them, 
     //at the same time capitalizing any trailing alpha characters 
     //to create a camel-case name
-    input = input.replace(/[^a-z0-9]+(.|$)/ig, function(match, letter, index) {
+    return input.replace(/[^a-z0-9]+(.|$)/ig, function(match, letter, index) {
       //capitalize if it's not the first letter. 
       //(the value could be a number or blank, 
       //but capitalizing doesn't affect those)
       return (!index) ? letter : capitalize(letter);
     });
-    console.log("camelCase", input);
-    return input;
   }
   //capitalize first letter
   function capitalize(value) {
