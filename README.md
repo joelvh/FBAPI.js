@@ -10,6 +10,9 @@ Please look at the FBAPI.js [source](https://raw.github.com/joelvh/FBAPI.js/mast
 
 ## Examples
 
+FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (known as "promises"). 
+Each method returns a reference to FBAPI, so you can chain method calls if you like.
+
 ### Load FBAPI.js and the Facebook SDK
 
 Facebook init options  
@@ -27,9 +30,7 @@ No need for adding the "fb-root" DIV tag required by the SDK or loading the [all
 
 ### Session data
 
-FBAPI.js has a "fluid" API and manages callbacks to make sure FB is loaded (kinda like "promises").
-
-The first parameter is optional and can contain a comma-separated list of permissions.  
+The first parameter is optional and can contain a comma-separated list of permissions. 
 The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus()  
 
       FBAPI.login("email,perm2,perm3", function(status, authResponse, error) {  
@@ -41,7 +42,7 @@ The callback parameters are the same for FBAPI.logout() and FBAPI.getLoginStatus
 
 ### Get data
 
-FBAPI.js also adds helper methods for profiles, objects, and connections.  
+FBAPI.js also adds helper methods for profiles, objects, and connections. 
 Facebook API responses are broken into callback parameters.
 
       //FBAPI.getProfile(callback) gets the data for the current user (e.g. FB.api('/me', callback))  
@@ -106,7 +107,7 @@ by passing a boolean value of "true" as the fourth parameter.
          //do something with results  
      });  
 
-Batching queries requires a named map.  The "params" property is not required.  
+Batching queries requires a named map.  The "params" property is not required. 
 It is possible to get the watchable object back instead of executing the query 
 by passing a boolean value of "true" as the third parameter.
 
@@ -124,6 +125,31 @@ by passing a boolean value of "true" as the third parameter.
          //do something with the data  
          console.log(resultMap.friends, resultMap.checkins);  
      });  
+
+### Accessing the whole Facebook Javascript SDK
+
+The Facebook Javascript SDK is accessible through the global variable "FB". 
+However, to take advantage of the promise architecture of FBAPI.js, you can access the SDK 
+through the FBAPI.sdk() method. This ensures that your call to the API will work, whether or not 
+the SDK is loaded yet.
+
+You can simply ensure your code gets a reference to "FB" before it's loaded by calling the helper method with a callback.
+
+    FBAPI.sdk(function(FB) {  
+        //No matter if the global veriable exists yet, this callback will be fired when it's ready  
+    });  
+
+You can access methods on "FB" that will fire when everything's ready.
+
+    //The first parameter is the method, any additional parameters are passed to the method.  
+    //In this case, the FB.login() method will be called, passing "callback" and the permissions.  
+    FBAPI.sdk('login', callback, { scope: permissions });  
+    
+    //You can access any nested methods on "FB", such as FB.Event.subscribe.  
+    FBAPI.sdk('Event.subscribe', 'auth.statusChange', callback);  
+    
+    //The namespace can optionally include the "FB" prefix. This is equivalent to the above.  
+    FBAPI.sdk('FB.Event.subscribe', 'auth.statusChange', callback);
 
 ## Copyright
 
