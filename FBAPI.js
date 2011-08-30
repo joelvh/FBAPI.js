@@ -14,7 +14,6 @@
   
   var facebook_lib_url = document.location.protocol + "//connect.facebook.net/en_US/all.js",
     responseCache = {},
-    regex_remove_pseudo = /\/(profile|object)$/i,
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
     //SOURCE URL: https://developers.facebook.com/docs/reference/api/user/
@@ -342,7 +341,7 @@
         id = "me";
       }
       if (!isArray(names)) {
-        return FBAPI.getData("/" + id + "/" + names, callback);
+        return FBAPI.getData(create_path(id, names), callback);
       }
       var responses = {},
         errors = [],
@@ -352,7 +351,7 @@
       each(names, function(index, name) {
         //reserved names "profile" and "object" used to get data by ID,
         //regex removes the name to get data by ID
-        var path = ("/" + id + '/' + name).replace(regex_remove_pseudo, "");
+        var path = create_path(id, name);
         
         if (responseCache[path]) {
           responses[name] = responseCache[path];
@@ -399,13 +398,12 @@
     },
     //get FB data and cache responses if not an error
     getData: function(path, callback) {
-      var is_pseudo = regex_remove_pseudo.test(path),
-        //callback used to with live or cached response
-        proxyCallback = function(response) {
-          fireCallbackWithResponseData(callback, response, (is_pseudo) ? true : "data", "error");
+      //callback used to with live or cached response
+      var proxyCallback = function(response) {
+          fireCallbackWithResponseData(callback, response, "data", "error");
         };
       
-      path = path.replace(regex_remove_pseudo, "");
+      path = create_path(path);
       //use cached response if possible
       if (responseCache[path]) {
         proxyCallback(responseCache[path]);
@@ -483,19 +481,13 @@
   function orNull(value, checkFalsey) {
     return (isUndefined(value) || (checkFalsey && isFalsey(value))) ? null : value;
   }
-  function extend(target, values, deep) {
-    !target && (target = {});
+  //Shallow copy
+  function extend(target, values) {
+    target = target || {};
     for (var property in values) {
       var value = values[property];
       if (!(property in target)) {
-        target[property] = !deep ? value : 
-          (value == null || isObject(value)) ? extend({}, value) : 
-          (isArray(value)) ? value.slice(0) : value;
-      // compares objects that already exist in target if "deep" is true
-      // copies properties or object if the target is NULL or an object
-      } else if (deep && isObject(value) && (target[property] == null || isObject(target[property]))) {
-        //don't need to set property because the object is updated by reference
-        /*target[property] = */extend(target[property] || {}, value, deep);
+        target[property] = value;
       }
     }
     return target;
@@ -515,13 +507,18 @@
     if (callback) {
       //map response property names to arguments
       each(args, function(index, propertyName) {
-        args[index] = (propertyName === true) ? response : orNull(response[propertyName]);
+        //if the property name is a boolean OR 
+        //if the property is "data" but it doesn't exist 
+        //in the response and there was no error, 
+        //assume it's a profile/object
+        var use_response = propertyName === true || (propertyName == "data" && !response[propertyName] && !response.error);
+        args[index] = (use_response) ? response : orNull(response[propertyName]);
       });
       //call callback with response data
       callback.apply(response, args);
     }
   }
-//create camel case name
+  //create camel case name
   function camelCase(input, capitalizeFirstLetter) {
     //find non-method characters and remove them, 
     //at the same time capitalizing any trailing alpha characters 
@@ -532,7 +529,7 @@
       if (/[a-z]/i.test(letter)) {
         //if this is the first letter of the name, leave case, 
         //otherwise capitalize
-        return (index == 0) ? letter : letter.toUpperCase(); 
+        return (!index) ? letter : capitalize(letter); 
       }
       //return an empty string if non-method chars where found 
       //without any trailing letters
@@ -541,7 +538,16 @@
     //lastly, after camel-casing, 
     //remove any leading numbers 
     //.replace(/^\d+/, "");
-    return (capitalizeFirstLetter) ? input[0].toUpperCase() + input.slice(1) : input;
+    return (capitalizeFirstLetter) ? capitalize(input) : input;
+  }
+  //capitalize first letter
+  function capitalize(value) {
+    return value[0].toUpperCase() + value.slice(1);
+  }
+  //create FB api path (this creates a path that does NOT have a leading slash). 
+  //e.g. "me/friends" is created, not "/me/friends", which works with FB.api(path, callback)
+  function create_path() {
+    return argumentsToArray(arguments).join("/").replace(/\/(profile|object)$/i, "");
   }
 
 
