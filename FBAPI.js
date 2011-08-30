@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Joel Van Horn
+ * Copyright 2011 Joel Van Horn (http://twitter.com/joelvh)
  * 
  * As of date: 8/28/2011
  * Use OAUTH2, old authentication methods are being deprecated 10/1/2011:
