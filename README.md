@@ -6,7 +6,7 @@ API calls and event subscribing are queued up and fired once the SDK is loaded a
 
 Please look at the FBAPI.js [source](https://raw.github.com/joelvh/FBAPI.js/master/FBAPI.js) file to get more details.  
 
-[Minified](https://raw.github.com/joelvh/FBAPI.js/master/FBAPI.min.js) version of FBAPI.js is 3.27KB (1.61KB gzipped).  I'm continuing to reduce the file size.
+[Minified](https://raw.github.com/joelvh/FBAPI.js/master/FBAPI.min.js) version of FBAPI.js is 3.45KB (1.68KB gzipped).  I'm continuing to reduce the file size.
 
 ## Examples
 
@@ -103,7 +103,8 @@ The second parameter "params" is not required.  The callback receives the result
 It is possible to get the watchable object back instead of executing the query 
 by passing a boolean value of "true" as the fourth parameter.
 
-     FBAPI.query("SELECT birthday FROM user WHERE uid = {0}", ["me()"], function(results) {  
+     //The second parameter can be a single param to the query, or an array of value
+     FBAPI.query("SELECT birthday FROM user WHERE uid = {0}", "me()", function(results) {  
          //do something with results  
      });  
 
@@ -122,6 +123,18 @@ by passing a boolean value of "true" as the third parameter.
          },  
      };  
      FBAPI.query(queries, function(resultMap) {  
+         //do something with the data  
+         console.log(resultMap.friends, resultMap.checkins);  
+     });  
+
+It is possible to nest queries in params, either as single values or in an array of params.  
+
+     var query = "SELECT name FROM friend WHERE uid1 IN {0}";  
+     var params = {  
+         query: "SELECT coords FROM checkin WHERE author_id = {0}",  
+         params: "me()" 
+     };  
+     FBAPI.query(query, params, function(resultMap) {  
          //do something with the data  
          console.log(resultMap.friends, resultMap.checkins);  
      });  

@@ -267,64 +267,87 @@
     
     ////// Data requests to facebook API ///////
     
-    //A single query can specify optional params:
+    //Execute an FQL query.  FBAPI.query() receives these parameters:
+    // - query = a string for single query or object map.
+    // - params = (optional) single query parameter or an array of parameters that get passed into query. 
+    //   A param can be a nested query, which will be converted to a waitable and is passed to the callback 
+    //   as the 3rd parameter.
+    // - callback(results, error, dependencies) - receives the results, 
+    //   "error" will have an array of strings (which includes query, multiple query, and nested query errors), 
+    //   "dependencies" are waitables created when subqueries were specified as params to a query
+    //A single query can specify optional "params":
     // - FBAPI.query("SELECT col FROM table WHERE uid = {0}", ["me()"], callback)
-    //"returnWaitable" will fire the callback with the facebook waitable object as a param, 
-    //otherwise the callback receives the queried data.
-    //Multiple queries can be specified by a map, and not specifying the "params" arg:
+    //The callback receives the queried data, error info in an array, and dependencies array.
+    //Multiple queries can be specified by a map, "params" property is optional:
     // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*...*/ }
-    //"returnWaitable" will fire the callback with a map of the facebook waitable objects as a param,
-    //otherwise the callback receives the queried data as a map.
+    //The callback receives the queried data as a map, error info in an array, and dependencies in an array.
+    //Nested queries are specified as parameters:
+    // - FBAPI.query("SELECT col FROM table WHERE uid IN ({0})", { query: "SELECT uid FROM user WHERE uid1 = me()" }, callback)
     //EXAMPLE: data passed to callback
     // - { friends: /*results*/, checkins: /*results*/ }
     //EXAMPLE: waitables passed to callback
     // - { friends: /*waitable*/, checkins: /*waitable*/ }
-    query: function(query, params, callback, returnWaitable) {
+    query: function(query, params, callback) {
       if (isFunction(params)) {
-        returnWaitable = callback;
         callback = params;
-        params = null;
+        params = [];
       }
+      
+      var single_query,
+        queries = query;
+      
       sdkReady(function(FB) {
         //if query is NOT an object, it should be a string, 
         //otherwise it's a map with multiple queries.
         if (!isObject(query)) {
-          var waitable = FB.Data.query(query);
-          
-          if (returnWaitable) {
-            callback(waitable);
-          } else {
-            waitable.wait(function() {
-              callback(waitable.value);
-            });
-          }
-          
-          return;
+          queries = {};
+          queries[single_query = FB.guid()] = { query: query, params: params };
         }
         
         //process multiple queries
         
-        var waitables = [],
-         waitableMap = {};
-         
+        var errors = [],
+          //could use the dependencies array to store all waitables. 
+          //is there value in returning dependencies instead of all queries?
+          waitables = [],
+          //query parameters that consisted of nested queries converted to waitables
+          dependencies = [],
+          //checks for nested queries, creates waitables, then passes back a query object
+          create_waitable = function(query, params) {
+            params = !isArray(params) ? [params] : params;
+            each(params, function(index, param) {
+              if (isObject(param) && param.query) {
+                //create a waitable, update parent param array, and add to dependency list
+                dependencies.push(params[index] = create_waitable(param.query, param.params));
+              }
+            });
+            
+            var waitable = FB.Data.query(query, params);
+            
+            //bind callbacks if not passing back the waitable
+            //waitable.wait(alert, alert)
+            waitable.subscribe("error", function(error) {
+              errors.push(error);
+            });
+            
+            return waitable;
+          };
+        
         for (var name in queries) {
-          var item = queries[name],
-           waitable = FB.Data.query(item.query, item.params);
-           
-          waitables.push(waitable);
-          waitableMap[name] = waitable;
+          waitables.push(queries[name] = create_waitable(queries[name].query, queries[name].params));
         }
         
-        if (returnWaitable) {
-          callback(waitableMap);
-        } else {
-          FB.Data.waitOn(waitables, function() {
-            for (var name in waitableMap) {
-              waitableMap[name] = waitableMap[name].value;
-            }
-            callback(waitableMap);
-          });
-        }
+        FB.Data.waitOn(waitables.concat(dependencies), function() {
+          //map waitable values back to return object
+          for (var name in queries) {
+            queries[name] = orNull(queries[name].value);
+          }
+          if (single_query) {
+            callback(queries[single_query], errors, dependencies);
+          } else {
+            callback(queries, errors, dependencies);
+          }
+        });
       });
     },
     //Batch requests:
