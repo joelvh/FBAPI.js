@@ -126,7 +126,7 @@ by passing a boolean value of "true" as the third parameter.
          console.log(resultMap.friends, resultMap.checkins);  
      });  
 
-### Accessing the whole Facebook Javascript SDK
+### Accessing the full Facebook Javascript SDK with promises
 
 The Facebook Javascript SDK is accessible through the global variable "FB". 
 However, to take advantage of the promise architecture of FBAPI.js, you can access the SDK 
