@@ -1,6 +1,8 @@
 /*
- * Date: 8/28/2011
- * Use OAUTH2, old authentication methods are being deprecated:
+ * Copyright 2011 Joel Van Horn
+ * 
+ * As of date: 8/28/2011
+ * Use OAUTH2, old authentication methods are being deprecated 10/1/2011:
  * https://developers.facebook.com/blog/post/525/
  * 
  * FB.getSession() is depricated and throws an error when used with OAUTH2
