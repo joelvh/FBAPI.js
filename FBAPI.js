@@ -13,7 +13,7 @@
   ////// Globals //////
   
   var facebook_lib_url = document.location.protocol + "//connect.facebook.net/en_US/all.js",
-    facebook_lib_script = document.createElement('SCRIPT')
+    facebook_lib_script = document.createElement('SCRIPT'),
     responseCache = {},
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
@@ -99,35 +99,43 @@
     },
     //Queue of callbacks to fire once 
     //Facebook Javascript SDK is loaded
-    sdkQueue = [],
+    sdkReadyQueue = [],
     sdkLoaded = false,
-    sdk = function(methodName) {
+    //Queues callbacks to be triggered once the Facebook Javascript SDK loads. 
+    //Optionally can pass in a method to call on FB and forward the callback
+    // - sdkReady('login', function(response) { /*code*/ });
+    //When the method name is not specified, 
+    //the callback is triggered with FB as the only parameter
+    // - sdkReady(function(FB) { /*code*/ })
+    sdkReady = function(methodName) {
       var callback;
       //if it's a function, it's a callback that accepts FB as a param
       if (isFunction(methodName)) {
         callback = methodName;
       } else {
         //remove the first argument (which is methodName)
-        var args = argumentsToArray(arguments);
-        args.shift();
+        var args = argumentsToArray(arguments, 1);
         //Create a callback that is fired on the specified FB method.
         callback = function(FB) {
           //The method could include namespace, such as "Event.subscribe" 
           //or "FB.Event.subscribe", so we split on "." and navigate through FB.
           var names = methodName.replace(/^FB\./i, "").split("."),
             target = FB;
+          
           //The last name in the namespace is the method name (e.g. "subscribe")
           methodName = names.pop();
+          
           //Navigate through remaining namespace
           each(names, function(index, name) {
             target = target[name];
           });
+
           //Call the method as if it was called directly.
           target[methodName].apply(target, args);
         }
       }
       if (!sdkLoaded) {
-        sdkQueue.push(callback);
+        sdkReadyQueue.push(callback);
       } else {
         callback(FB);
       }
@@ -164,8 +172,8 @@
         
         //loop through callbacks there were queued 
         //before Facebook Javascript SDK was loaded
-        while (sdkQueue.length) {
-          sdkQueue.shift()(FB);
+        while (sdkReadyQueue.length) {
+          sdkReadyQueue.shift()(FB);
         }
         
         sdkLoaded = true;
@@ -193,29 +201,7 @@
       
       return FBAPI;
     },
-    //Queues callbacks to be triggered once the Facebook Javascript SDK loads. 
-    //Optionally can pass in a method to call on FB and forward the callback
-    // - sdk('login', function(response) { /*code*/ });
-    //When the method name is not specified, 
-    //the callback is triggered with FB as the only parameter
-    // - sdk(function(FB) { /*code*/ })
-    sdk: sdk,
-    //Allows you to chain multiple callbacks together. 
-    //The first parameter for each callback is the "next" function 
-    //that allows you to pass arguments to the next function.
-    //Pass each function that should be a part of the chain 
-    //as a parameter to chain.
-    chain: function () {
-      var steps = Array.prototype.slice.call(arguments),
-        next = function() {
-          var args = Array.prototype.slice.call(arguments),
-            step = steps.shift();
-          args.unshift(next);
-          step.apply(this, args);
-        };
-        
-      next();
-    },
+    sdk: sdkReady,
     
     ////// auth functions ///////
     
@@ -226,14 +212,14 @@
         callback = perms;
         perms = null;
       }
-      sdk('login', 
+      sdkReady('login', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
         }, (perms) ? {scope: perms} : null);
     },
     logout: function(callback) {
-      sdk('logout', 
+      sdkReady('logout', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
@@ -241,7 +227,7 @@
     },
     //callback(status, session/authResponse, error)
     getLoginStatus: function(callback) {
-      sdk('getLoginStatus', 
+      sdkReady('getLoginStatus', 
         function(response) {
           //"session" is legacy, "authResponse" is OAUTH2
           fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
@@ -255,12 +241,12 @@
     ////// subscribe/unsubscribe aliases renamed from facebook API ////////
     
     bind: function(eventName, callback) {
-      sdk('Event.subscribe', eventName, callback);
+      sdkReady('Event.subscribe', eventName, callback);
       
       return FBAPI;
     },
     unbind: function(eventName, callback) {
-      sdk(function(FB) {
+      sdkReady(function(FB) {
         if (eventName) {
           FB.Event.unsubscribe(eventName, callback);
         } else {
@@ -295,28 +281,10 @@
         callback = params;
         params = null;
       }
-      sdk(function(FB) {
-        if (isObject(query)) {
-          var waitables = [],
-           waitableMap = {};
-          for (var name in queries) {
-            var item = queries[name],
-             waitable = FB.Data.query(item.query, item.params);
-             
-            waitables.push(waitable);
-            waitableMap[name] = waitable;
-          }
-          if (returnWaitable) {
-            callback(waitableMap);
-          } else {
-            FB.Data.waitOn(waitables, function() {
-              for (var name in waitableMap) {
-                waitableMap[name] = waitableMap[name].value;
-              }
-              callback(waitableMap);
-            });
-          }
-        } else {
+      sdkReady(function(FB) {
+        //if query is NOT an object, it should be a string, 
+        //otherwise it's a map with multiple queries.
+        if (!isObject(query)) {
           var waitable = FB.Data.query(query);
           
           if (returnWaitable) {
@@ -326,6 +294,32 @@
               callback(waitable.value);
             });
           }
+          
+          return;
+        }
+        
+        //process multiple queries
+        
+        var waitables = [],
+         waitableMap = {};
+         
+        for (var name in queries) {
+          var item = queries[name],
+           waitable = FB.Data.query(item.query, item.params);
+           
+          waitables.push(waitable);
+          waitableMap[name] = waitable;
+        }
+        
+        if (returnWaitable) {
+          callback(waitableMap);
+        } else {
+          FB.Data.waitOn(waitables, function() {
+            for (var name in waitableMap) {
+              waitableMap[name] = waitableMap[name].value;
+            }
+            callback(waitableMap);
+          });
         }
       });
     },
@@ -393,7 +387,7 @@
       };
       
       //call Facebook batch API
-      sdk("api", "/", "POST", batchRequest, 
+      sdkReady("api", "/", "POST", batchRequest, 
         function(results) {
           each(results, function(index, result) {
             //Parse the response body, which is serialized JSON
@@ -424,7 +418,7 @@
         proxyCallback(responseCache[path]);
       } else {
         //get a new response
-        sdk('api', path, 
+        sdkReady('api', path, 
           function(response) {
             //if not an error, cache response
             if (!response.error) {
@@ -442,7 +436,7 @@
   
   //Generates methods on FBAPI like FBAPI.getFriends(id, callback)
   each(facebook_connection_types, function(index, name) {
-    FBAPI["get" + camelCase(name, true)] = function(id, callback) {
+    FBAPI[camelCase("get", name)] = function(id, callback) {
       return FBAPI.get(name, id, callback);
     };
   });
@@ -451,7 +445,7 @@
   //However, any event names prefixed with "auth.", such as "auth.login" 
   //will have "auth." removed and become FBAPI.onLogin()
   each(facebook_api_events, function(index, name) {
-    FBAPI["on" + camelCase(name.replace(/^auth\./i, ""), true)] = function(callback) {
+    FBAPI[camelCase("on", name.replace(/^auth\./i, ""))] = function(callback) {
       return FBAPI.bind(name, callback);
     };
   })
@@ -490,8 +484,11 @@
   function isObject(item) {
     return item && item + "" == "[object Object]";
   }
-  function argumentsToArray(items) {
-    return Array.prototype.slice.call(items);
+  //Accepts an arguments object or an array as the first parameter. 
+  //Optionally can pass in the number of arguments to remove from 
+  //the beginning of the array.
+  function argumentsToArray(items, howManyToRemove) {
+    return Array.prototype.slice.call(items).splice(howManyToRemove || 0);
   }
   function orNull(value, checkFalsey) {
     return (isUndefined(value) || (checkFalsey && isFalsey(value))) ? null : value;
@@ -500,9 +497,8 @@
   function extend(target, values) {
     target = target || {};
     for (var property in values) {
-      var value = values[property];
       if (!(property in target)) {
-        target[property] = value;
+        target[property] = values[property];
       }
     }
     return target;
@@ -514,10 +510,8 @@
   //fireCallbackWithResponseData(callback, response, "status", "authResponse", "error")
   // - the parameters to the callback will be response.status, response.authResponse, 
   //   and response.error
-  function fireCallbackWithResponseData(/*callback,response,property1,propery2,...*/) {
-    var args = argumentsToArray(arguments),
-      callback = args.shift(),
-      response = args.shift();
+  function fireCallbackWithResponseData(callback, response/*property1,propery2,...*/) {
+    var args = argumentsToArray(arguments, 2);
     
     if (callback) {
       //map response property names to arguments
@@ -533,27 +527,26 @@
       callback.apply(response, args);
     }
   }
-  //create camel case name
-  function camelCase(input, capitalizeFirstLetter) {
+  //Takes multiple parameters and concatenates each value 
+  //to create a camel-case name.  Also splits parameter values 
+  //on non-alphanumeric values to create additional camel-cases.
+  // - camelCase("on", "login") returns "onLogin"
+  // - camelCase("on", "comment.create") returns "onCommentCreate"
+  function camelCase() {
+    //concatenate arguments with non-alphanumeric character
+    //as place holder for creating camel-case
+    var input = argumentsToArray(arguments).join(".");
     //find non-method characters and remove them, 
     //at the same time capitalizing any trailing alpha characters 
     //to create a camel-case name
     input = input.replace(/[^a-z0-9]+(.|$)/ig, function(match, letter, index) {
-      //test to see if the char following non-method name chars 
-      //is a letter
-      if (/[a-z]/i.test(letter)) {
-        //if this is the first letter of the name, leave case, 
-        //otherwise capitalize
-        return (!index) ? letter : capitalize(letter); 
-      }
-      //return an empty string if non-method chars where found 
-      //without any trailing letters
-      return ""; 
+      //capitalize if it's not the first letter. 
+      //(the value could be a number or blank, 
+      //but capitalizing doesn't affect those)
+      return (!index) ? letter : capitalize(letter);
     });
-    //lastly, after camel-casing, 
-    //remove any leading numbers 
-    //.replace(/^\d+/, "");
-    return (capitalizeFirstLetter) ? capitalize(input) : input;
+    console.log("camelCase", input);
+    return input;
   }
   //capitalize first letter
   function capitalize(value) {
