@@ -141,6 +141,8 @@
       } else {
         callback(FB);
       }
+      
+      return FBAPI;
     },
     initialized = false;
     
