@@ -121,3 +121,14 @@ by passing a boolean value of "true" as the third parameter.
          //do something with the data  
          console.log(resultMap.friends, resultMap.checkins);  
      });  
+
+## Copyright
+
+FBAPI.js was written by Joel Van Horn.  You are free to use this library as you please.
+
+Feel free to get in touch with me through GitHub if you have any questions or suggestions.
+
+Let me know what you use FBAPI.js for!
+
+
+
