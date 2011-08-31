@@ -379,15 +379,21 @@
         if (error) {
           console.log("FBAPI.testResults... ERROR:", error);
         } else {
-          var table = function(data) {
+          var table = function(data, prefix) {
             //loop through records
             each(data, function(index, data) {
               var args = [];
               //output prefix (e.g. indenting)
-              args.push(">>  ");
+              prefix && args.push(prefix);
               //add columns
               for (var name in data) {
-                args.push("  [" + name + "]:", data[name]);
+                var value = data[name];
+                if (isArray(value) && value.length) {
+                  console.log(prefix + "  ", "NESTED LIST:", name);
+                  table(value, prefix + "  ");
+                } else {
+                  args.push("  [" + name + "]:", value);
+                }
               }
               //output columns
               console.log.apply(console, args);
@@ -398,12 +404,12 @@
             //go through map to output data for each result set
             for (var name in data) {
               console.log("FBAPI.testResults... RESULTS FOR:", name);
-              table(data[name]);
+              table(data[name], ">>  ");
             }
           } else {
             console.log("FBAPI.testResults... RESULTS");
             
-            table(data);
+            table(data, "  ");
           }
           
           console.log("FBAPI.testResults... DONE");
