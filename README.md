@@ -139,6 +139,11 @@ It is possible to nest queries in params, either as single values or in an array
          console.log(resultMap.friends, resultMap.checkins);  
      });  
 
+#### Debugging queries
+
+There is a helper method FBAPI.testResults() which lets you test queries as if calling FBAPI.query() without a callback. 
+Results (or error messages) are output to the console.
+
 ### Accessing the full Facebook Javascript SDK with promises
 
 The Facebook Javascript SDK is accessible through the global variable "FB". 

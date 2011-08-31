@@ -273,16 +273,20 @@
     //   A param can be a nested query, which will be converted to a waitable and is passed to the callback 
     //   as the 3rd parameter.
     // - callback(results, error, dependencies) - receives the results, 
-    //   "error" will have an array of strings (which includes query, multiple query, and nested query errors), 
+    //   "error" will have an error message (which includes query, multiple query, and nested query errors), 
     //   "dependencies" are waitables created when subqueries were specified as params to a query
     //A single query can specify optional "params":
     // - FBAPI.query("SELECT col FROM table WHERE uid = {0}", ["me()"], callback)
-    //The callback receives the queried data, error info in an array, and dependencies array.
+    //The callback receives the queried data, error message, and dependencies array.
     //Multiple queries can be specified by a map, "params" property is optional:
-    // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*...*/ }
-    //The callback receives the queried data as a map, error info in an array, and dependencies in an array.
+    // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*map*/ }
+    //Multiple queries can be specified in a map with a flatter format if no params are needed:
+    // - { friends: "SELECT col FROM friends WHERE uid=me()", checkins: /*query*/ }
+    //The callback receives the queried data as a map, error message, and dependencies in an array.
     //Nested queries are specified as parameters:
     // - FBAPI.query("SELECT col FROM table WHERE uid IN ({0})", { query: "SELECT uid FROM user WHERE uid1 = me()" }, callback)
+    //Nested queries can also be inline if there are no params (params can be in an array if there are more than 1):
+    // - FBAPI.query("SELECT col FROM table WHERE uid IN ({0})", "SELECT uid FROM user WHERE uid1 = me()", callback)
     //EXAMPLE: data passed to callback
     // - { friends: /*results*/, checkins: /*results*/ }
     //EXAMPLE: waitables passed to callback
@@ -303,38 +307,59 @@
           queries = {};
           queries[single_query = FB.guid()] = { query: query, params: params };
         }
-        
+
         //process multiple queries
         
-        var errors = [],
+        var error_reported = false,
           //could use the dependencies array to store all waitables. 
           //is there value in returning dependencies instead of all queries?
           waitables = [],
           //query parameters that consisted of nested queries converted to waitables
           dependencies = [],
-          //checks for nested queries, creates waitables, then passes back a query object
-          create_waitable = function(query, params) {
-            params = !isArray(params) ? [params] : params;
+          //checks for nested queries, creates waitables, then passes back a query object.
+          //this could be a map or it could be a string query
+          create_waitable = function(map) {
+            var is_map = isObject(map);
+            //throw an error if the query is blank because the map could be in the wrong format
+            if (!map || (is_map && !map.query)) {
+              throw Error("FBAPI.query error: no query specified.");
+            }
+            var query = map.query, 
+              params = map.params;
+            //not a map, must be a string
+            if (!is_map) {
+              query = map;
+            }
+            //make sure the params are in an array
+            params = isArray(params) ? params : (params != null) ? [params] : [];
+            //loop through each pram looking for another query
             each(params, function(index, param) {
-              if (isObject(param) && param.query) {
+              //if the param has a query property, it's a map, 
+              //else if it starts with "select", it's a query.
+              if (param.query || /^\s*select\s+/i.test(param)) {
                 //create a waitable, update parent param array, and add to dependency list
-                dependencies.push(params[index] = create_waitable(param.query, param.params));
+                dependencies.push(params[index] = create_waitable(param));
               }
             });
             
             var waitable = FB.Data.query(query, params);
-            
-            //bind callbacks if not passing back the waitable
+            //FB.Data.waitOn() does not trigger a callback if there is an error.
+            //It dies after the first error.
             //waitable.wait(alert, alert)
             waitable.subscribe("error", function(error) {
-              errors.push(error);
+              //only report the first error since FB.Data.waitOn() triggers 
+              //the same error on all waitables.
+              !error_reported && callback(null, error.message, dependencies);
+              error_reported = true;
             });
             
             return waitable;
           };
         
         for (var name in queries) {
-          waitables.push(queries[name] = create_waitable(queries[name].query, queries[name].params));
+          console.log("name", name, "value", queries[name])
+          //the property value could be a string (query) directly embedded, no params
+          waitables.push(queries[name] = create_waitable(queries[name]));
         }
         
         FB.Data.waitOn(waitables.concat(dependencies), function() {
@@ -342,13 +367,50 @@
           for (var name in queries) {
             queries[name] = orNull(queries[name].value);
           }
-          if (single_query) {
-            callback(queries[single_query], errors, dependencies);
-          } else {
-            callback(queries, errors, dependencies);
-          }
+          //return data, remove map if FBAPI.query was called with one query as a string
+          callback((single_query) ? queries[single_query] : queries, null, dependencies);
         });
       });
+      
+      return FBAPI;
+    },
+    testResults: function(query, params) {
+      FBAPI.query(query, params, function(data, error, dependencies) {
+        if (error) {
+          console.log("FBAPI.testResults... ERROR:", error);
+        } else {
+          var table = function(data) {
+            //loop through records
+            each(data, function(index, data) {
+              var args = [];
+              //output prefix (e.g. indenting)
+              args.push(">>  ");
+              //add columns
+              for (var name in data) {
+                args.push("  [" + name + "]:", data[name]);
+              }
+              //output columns
+              console.log.apply(console, args);
+            });
+          };
+          
+          if (isObject(data)) {
+            //go through map to output data for each result set
+            for (var name in data) {
+              console.log("FBAPI.testResults... RESULTS FOR:", name);
+              table(data[name]);
+            }
+          } else {
+            console.log("FBAPI.testResults... RESULTS");
+            
+            table(data);
+          }
+          
+          console.log("FBAPI.testResults... DONE");
+        }
+      });
+      
+      return FBAPI;
     },
     //Batch requests:
     //if one name is specified, returns the data or error object, e.g. callback(data, error)
@@ -509,7 +571,7 @@
     return item && item.constructor === Array;
   }
   function isObject(item) {
-    return item && item + "" == "[object Object]";
+    return !isArray(item) && item + "" == "[object Object]";
   }
   //Accepts an arguments object or an array as the first parameter. 
   //Optionally can pass in the number of arguments to remove from 
