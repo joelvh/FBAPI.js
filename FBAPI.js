@@ -99,6 +99,12 @@
       //and defer execution to keep async scripts executing in order
       defer: false
     },
+    stdout = !isUndefined(console) ? function() { console.log.apply(console, arguments); } : null,
+    debug = function() {
+      if (isFunction(stdout)) {
+        stdout.apply(FBAPI, arguments);
+      }
+    },
     //Queue of callbacks to fire once 
     //Facebook Javascript SDK is loaded
     sdkReadyQueue = [],
@@ -144,7 +150,13 @@
       
       return FBAPI;
     },
-    initialized = false;
+    initialized = false,
+    authResponseHandlerFactory = function(callback) {
+      return function(response) {
+        //"session" is legacy, "authResponse" is OAUTH2
+        fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
+      }
+    };
     
   ////// Init FBAPI //////
   
@@ -205,7 +217,17 @@
       
       return FBAPI;
     },
-    sdk: sdkReady,
+    //access the Facebook API safely
+    ready: sdkReady,
+    $: sdkReady,
+    //set the callback that gets all debug info
+    stdout: function(callback) {
+      if (isFunction(callback)) {
+        stdout = callback;
+      }
+    },
+    //dump data
+    debug: debug,
     
     ////// auth functions ///////
     
@@ -216,26 +238,14 @@
         callback = perms;
         perms = null;
       }
-      sdkReady('login', 
-        function(response) {
-          //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
-        }, (perms) ? {scope: perms} : null);
+      sdkReady('login', authResponseHandlerFactory(callback), (perms) ? {scope: perms} : null);
     },
     logout: function(callback) {
-      sdkReady('logout', 
-        function(response) {
-          //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
-        });
+      sdkReady('logout', authResponseHandlerFactory(callback));
     },
     //callback(status, session/authResponse, error)
     getLoginStatus: function(callback) {
-      sdkReady('getLoginStatus', 
-        function(response) {
-          //"session" is legacy, "authResponse" is OAUTH2
-          fireCallbackWithResponseData(callback, response, "status", "authResponse", "error");
-        });
+      sdkReady('getLoginStatus', authResponseHandlerFactory(callback));
     },
     //alias for FB.login()
     requestPermission: function(perms, callback) {
@@ -250,16 +260,10 @@
       return FBAPI;
     },
     unbind: function(eventName, callback) {
-      sdkReady(function(FB) {
-        if (eventName) {
-          FB.Event.unsubscribe(eventName, callback);
-        } else {
-          //if no event name is specified, loop through all events 
-          //that we generated a helper method for
-          each(facebook_api_events, function(index, eventName) {
-            FB.Event.unsubscribe(eventName, callback);
-          });
-        }
+      //if no event name is specified, loop through all events 
+      //that we generated a helper method for
+      each((eventName) ? [eventName] : facebook_api_events, function(index, eventName) {
+        sdkReady('Event.unsubscribe', eventName, callback);
       });
       
       return FBAPI;
@@ -275,20 +279,27 @@
     // - callback(results, error, dependencies) - receives the results, 
     //   "error" will have an error message (which includes query, multiple query, and nested query errors), 
     //   "dependencies" are waitables created when subqueries were specified as params to a query
+    //
     //A single query can specify optional "params":
     // - FBAPI.query("SELECT col FROM table WHERE uid = {0}", ["me()"], callback)
+    //
     //The callback receives the queried data, error message, and dependencies array.
     //Multiple queries can be specified by a map, "params" property is optional:
     // - { friends: { query: "SELECT col FROM friends WHERE uid={0}", params: ["me()"]}, checkins: /*map*/ }
+    //
     //Multiple queries can be specified in a map with a flatter format if no params are needed:
     // - { friends: "SELECT col FROM friends WHERE uid=me()", checkins: /*query*/ }
+    //
     //The callback receives the queried data as a map, error message, and dependencies in an array.
     //Nested queries are specified as parameters:
     // - FBAPI.query("SELECT col FROM table WHERE uid IN ({0})", { query: "SELECT uid FROM user WHERE uid1 = me()" }, callback)
+    //
     //Nested queries can also be inline if there are no params (params can be in an array if there are more than 1):
     // - FBAPI.query("SELECT col FROM table WHERE uid IN ({0})", "SELECT uid FROM user WHERE uid1 = me()", callback)
+    //
     //EXAMPLE: data passed to callback
     // - { friends: /*results*/, checkins: /*results*/ }
+    //
     //EXAMPLE: waitables passed to callback
     // - { friends: /*waitable*/, checkins: /*waitable*/ }
     query: function(query, params, callback) {
@@ -342,7 +353,7 @@
               }
             });
             
-            var waitable = FB.Data.query(query, params);
+            var waitable = FB.Data.query.apply(FB.Data, [query].concat(params));
             //FB.Data.waitOn() does not trigger a callback if there is an error.
             //It dies after the first error.
             //waitable.wait(alert, alert)
@@ -357,7 +368,7 @@
           };
         
         for (var name in queries) {
-          console.log("name", name, "value", queries[name])
+          debug("name", name, "value", queries[name])
           //the property value could be a string (query) directly embedded, no params
           waitables.push(queries[name] = create_waitable(queries[name]));
         }
@@ -375,9 +386,12 @@
       return FBAPI;
     },
     testResults: function(query, params) {
+      if (!stdout) {
+        alert("Pass console.log (or other callback) to FBAPI.stdout() to receive the debug output from FBAPI.testResults()")
+      }
       FBAPI.query(query, params, function(data, error, dependencies) {
         if (error) {
-          console.log("FBAPI.testResults... ERROR:", error);
+          debug("FBAPI.testResults... ERROR:", error);
         } else {
           var table = function(data, prefix) {
             //loop through records
@@ -389,30 +403,30 @@
               for (var name in data) {
                 var value = data[name];
                 if (isArray(value) && value.length) {
-                  console.log(prefix + "  ", "NESTED LIST:", name);
+                  debug(prefix + "  ", "NESTED LIST:", name);
                   table(value, prefix + "  ");
                 } else {
                   args.push("  [" + name + "]:", value);
                 }
               }
               //output columns
-              console.log.apply(console, args);
+              debug.apply(console, args);
             });
           };
           
           if (isObject(data)) {
             //go through map to output data for each result set
             for (var name in data) {
-              console.log("FBAPI.testResults... RESULTS FOR:", name);
+              debug("FBAPI.testResults... RESULTS FOR:", name);
               table(data[name], ">>  ");
             }
           } else {
-            console.log("FBAPI.testResults... RESULTS");
+            debug("FBAPI.testResults... RESULTS");
             
             table(data, "  ");
           }
           
-          console.log("FBAPI.testResults... DONE");
+          debug("FBAPI.testResults... DONE");
         }
       });
       
@@ -426,16 +440,23 @@
     //EXAMPLES:
     //FBAPI.get('profile', function(data, error) { /*callback code*/ })
     // - gets the profile for "me" (currently logged-in user), data is NULL if there was an error
+    //
     //FBAPI.get('profile', 'username', callback)
     // - gets the profile for the specified username (the 'profile' parameter is optional when getting a profile)
+    //
     //FBAPI.get('object', '1234567', callback)
     // - gets the object specified by the ID
+    //
     //FBAPI.get('1234567', callback)
     // - gets the object specified by the ID (can be a profile or other object)
+    //
     //FBAPI.get(['profile', 'friends', 'checkins'], function(dataMap, errorArray) { /*callback code*/ })
     // - dataMap = { profile: /*data*/, friends: /*data*/, checkins: /*data*/ }
     // - errorArray = [ profileError, friendsError, checkinsError ]
     // - gets each of the pieces of data for "me", callback receives a map of data and array of errors
+    // - *overload: can pass in a string with spaces or commas instead of an array 
+    //   (e.g. 'profile friends checkins' or 'profile,friends,checkins')
+    //
     //FBAPI.get(['profile', 'friends', 'checkins'], '1234567', callback)
     // - gets each of the pieces of data for the specified ID
     get: function(names, id, callback) {
@@ -444,13 +465,21 @@
         callback = id;
         id = "me";
       }
+
+      //allow names to be separated by space
       if (!isArray(names)) {
+        names = names.split(/[\s,]+/);
+      }
+      
+      if (names.length == 1) {
         return FBAPI.getData(create_path(id, names), callback);
       }
+      
       var responses = {},
         errors = [],
         batch = [],
         names_not_cached = [];
+        
       //call the API for each named function
       each(names, function(index, name) {
         //reserved names "profile" and "object" used to get data by ID,
@@ -540,9 +569,16 @@
   //However, any event names prefixed with "auth.", such as "auth.login" 
   //will have "auth." removed and become FBAPI.onLogin()
   each(facebook_api_events, function(index, name) {
-    FBAPI[camelCase("on", name.replace(/^auth\./i, ""))] = function(callback) {
-      return FBAPI.bind(name, callback);
+    var auth_event_regex = /^auth\./i;
+    FBAPI[camelCase("on", name.replace(auth_event_regex, ""))] = function(callback) {
+      //if this is an auth event, proxy callback to to pass specific parameters to original callback
+      // - callback(status, authResponse, error);
+      return FBAPI.bind(name, auth_event_regex.test(name) ? authResponseHandlerFactory(callback) : callback);
     };
+    //subscribe for debugging
+    FBAPI.bind(name, function() {
+      FBAPI.debug.apply(FBAPI, ["FB.Event", name].concat(arguments));
+    })
   })
   
   
@@ -607,6 +643,8 @@
   //   and response.error
   function fireCallbackWithResponseData(callback, response/*property1,propery2,...*/) {
     var args = argumentsToArray(arguments, 2);
+    
+    FBAPI.debug("fireCallbackWithResponseData response", response)
     
     if (callback) {
       //map response property names to arguments
