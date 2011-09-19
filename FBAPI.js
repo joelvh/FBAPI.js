@@ -17,6 +17,7 @@
   var facebook_lib_url = document.location.protocol + "//connect.facebook.net/en_US/all.js",
     facebook_lib_script = document.createElement('SCRIPT'),
     responseCache = {},
+    is_select_regex = /^\s*select\s+/i,
     //connections to generate helpers such as FBAPI.getAccounts(id,callback)
     //LIST GENERATED: 8/28/2011
     //SOURCE URL: https://developers.facebook.com/docs/reference/api/user/
@@ -347,7 +348,7 @@
             each(params, function(index, param) {
               //if the param has a query property, it's a map, 
               //else if it starts with "select", it's a query.
-              if (param.query || /^\s*select\s+/i.test(param)) {
+              if (param.query || is_select_regex.test(param)) {
                 //create a waitable, update parent param array, and add to dependency list
                 dependencies.push(params[index] = create_waitable(param));
               }
@@ -389,6 +390,7 @@
       if (!stdout) {
         alert("Pass console.log (or other callback) to FBAPI.stdout() to receive the debug output from FBAPI.testResults()")
       }
+      
       FBAPI.query(query, params, function(data, error, dependencies) {
         if (error) {
           debug("FBAPI.testResults... ERROR:", error);
