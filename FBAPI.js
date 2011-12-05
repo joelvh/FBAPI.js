@@ -531,6 +531,14 @@
       
       return FBAPI;
     },
+    //get a list of responses received based on the graph API path requested
+    cachedResponses: function() {
+      return responseCache;
+    },
+    //clear the response cache
+    clearResponses: function() {
+      return responseCache = {};
+    },
     //get FB data and cache responses if not an error
     getData: function(path, callback) {
       //callback used to with live or cached response
