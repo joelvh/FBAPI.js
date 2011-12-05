@@ -102,9 +102,13 @@
     },
     stdout = !isUndefined(console) ? function() { console.log.apply(console, arguments); } : null,
     debug = function() {
+      return debug_array(arguments);
+    },
+    debug_array = function(arr) {
       if (isFunction(stdout)) {
-        stdout.apply(FBAPI, arguments);
+        stdout.apply(FBAPI, arr);
       }
+      return FBAPI;
     },
     //Queue of callbacks to fire once 
     //Facebook Javascript SDK is loaded
@@ -117,13 +121,31 @@
     //the callback is triggered with FB as the only parameter
     // - sdkReady(function(FB) { /*code*/ })
     sdkReady = function(methodName) {
-      var callback;
+      //remove the first argument (which is methodName)
+      var args = argumentsToArray(arguments, 1),
+          callback,
+          proxy = function(callback) {
+            var method = isFunction(methodName) ? '' : methodName,
+                output = [];
+            
+            !method && output.push("FBAPI.ready called with args:") && (output = output.concat(args))
+            method && output.push("FB.", method);
+            /Event/.test(method) && output.push("for event", args[0]);
+            
+            debug_array(output);
+            
+            return function() {
+              var self = {
+                method: method,
+                args: args
+              };
+              callback.apply(self, arguments);
+            };
+          };
       //if it's a function, it's a callback that accepts FB as a param
       if (isFunction(methodName)) {
         callback = methodName;
       } else {
-        //remove the first argument (which is methodName)
-        var args = argumentsToArray(arguments, 1);
         //Create a callback that is fired on the specified FB method.
         callback = function(FB) {
           //The method could include namespace, such as "Event.subscribe" 
@@ -141,8 +163,12 @@
 
           //Call the method as if it was called directly.
           target[methodName].apply(target, args);
-        }
+        };
       }
+      
+      //proxy callback
+      callback = proxy(callback);
+      
       if (!sdkLoaded) {
         sdkReadyQueue.push(callback);
       } else {
@@ -386,14 +412,24 @@
       
       return FBAPI;
     },
-    testResults: function(query, params) {
+    //Optionally pass in the "options" object:
+    // - skipNulls = true/false (default = false) - to not output columns with null values
+    testResults: function(query, params, options) {
       if (!stdout) {
         alert("Pass console.log (or other callback) to FBAPI.stdout() to receive the debug output from FBAPI.testResults()")
       }
+      if (isObject(params)) {
+        options = params;
+        params = null;
+      }
+      
+      !options && (options = {});
+      
+      var debug_prefix = "FBAPI.testResults... ";
       
       FBAPI.query(query, params, function(data, error, dependencies) {
         if (error) {
-          debug("FBAPI.testResults... ERROR:", error);
+          debug(debug_prefix, "ERROR:", error);
         } else {
           var table = function(data, prefix) {
             //loop through records
@@ -401,34 +437,45 @@
               var args = [];
               //output prefix (e.g. indenting)
               prefix && args.push(prefix);
-              //add columns
-              for (var name in data) {
-                var value = data[name];
-                if (isArray(value) && value.length) {
-                  debug(prefix + "  ", "NESTED LIST:", name);
-                  table(value, prefix + "  ");
-                } else {
-                  args.push("  [" + name + "]:", value);
+              
+              if (isObject(data)) {
+                //add columns
+                for (var name in data) {
+                  var value = data[name];
+                  if (isArray(value) && value.length) {
+                    debug(prefix + "  ", "NESTED LIST:", name);
+                    table(value, prefix + "  ");
+                  } else if (!options.skipNulls || value != null && (!isArray(value) || value.length)) {
+                    args.push("  [" + name + "]:", value);
+                  }
                 }
+              
+                //output columns
+                debug_array(args);
+                
+              } else if (isArray(data)) {
+                table(data, prefix + "  ");
+              } else {
+                args.push("  [" + index + "]:", data);
+                //output columns
+                debug_array(args);
               }
-              //output columns
-              debug.apply(console, args);
             });
           };
           
           if (isObject(data)) {
             //go through map to output data for each result set
             for (var name in data) {
-              debug("FBAPI.testResults... RESULTS FOR:", name);
+              debug(debug_prefix, "RESULTS FOR:", name);
               table(data[name], ">>  ");
             }
           } else {
-            debug("FBAPI.testResults... RESULTS");
+            debug(debug_prefix, "RESULTS");
             
             table(data, "  ");
           }
           
-          debug("FBAPI.testResults... DONE");
+          debug(debug_prefix, "DONE");
         }
       });
       
@@ -587,7 +634,7 @@
     };
     //subscribe for debugging
     FBAPI.bind(name, function() {
-      FBAPI.debug.apply(FBAPI, ["FB.Event", name].concat(arguments));
+      debug_array(["FB.Event", name].concat(arguments));
     })
   })
   
@@ -654,7 +701,7 @@
   function fireCallbackWithResponseData(callback, response/*property1,propery2,...*/) {
     var args = argumentsToArray(arguments, 2);
     
-    FBAPI.debug("fireCallbackWithResponseData response", response)
+    debug("fireCallbackWithResponseData response", response)
     
     if (callback) {
       //map response property names to arguments
