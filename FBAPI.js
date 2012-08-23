@@ -110,6 +110,10 @@
       }
       return FBAPI;
     },
+    //copied from deprecated FB.guid() method in Facebook JavaScript SDK
+    guid = function () {
+      return 'f' + (Math.random() * (1 << 30)).toString(16).replace('.', '');
+    },
     //Queue of callbacks to fire once 
     //Facebook Javascript SDK is loaded
     sdkReadyQueue = [],
@@ -343,7 +347,7 @@
         //otherwise it's a map with multiple queries.
         if (!isObject(query)) {
           queries = {};
-          queries[single_query = FB.guid()] = { query: query, params: params };
+          queries[single_query = guid()] = { query: query, params: params };
         }
 
         //process multiple queries
