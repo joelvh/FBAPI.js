@@ -100,7 +100,7 @@
       //and defer execution to keep async scripts executing in order
       defer: false
     },
-    stdout = window['console'] ? function() { console.log.apply(console, arguments); } : function() {},
+    stdout = window['console'] ? function() { console.log.apply(console, arguments); } : null,
     debug = function() {
       return debug_array(arguments);
     },
@@ -254,13 +254,11 @@
     enableDebugging = false,
     //set the callback that gets all debug info
     stdout: function(callback) {
-      if (callback) {
-        stdout = callback;
-      }
+      stdout = callback;
     },
     //dump data
     debug: function() {
-      if (this.enableDebugging) {
+      if (FBAPI.enableDebugging) {
         debug.apply(this, arguments)
       }
     },
@@ -426,6 +424,8 @@
     testResults: function(query, params, options) {
       if (!stdout) {
         alert("Pass console.log (or other callback) to FBAPI.stdout() to receive the debug output from FBAPI.testResults()")
+      } else if (!FBAPI.enableDebugging) {
+        alert("Enable debugging (FBAPI.enableDebugging = true) to view debug output from FBAPI.testResults()")
       }
       if (isObject(params)) {
         options = params;
