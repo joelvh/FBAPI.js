@@ -105,7 +105,7 @@
       return debug_array(arguments);
     },
     debug_array = function(arr) {
-      if (stdout) {
+      if (FBAPI.enableDebugging && stdout) {
         stdout.apply(FBAPI, arr);
       }
       return FBAPI;
@@ -258,9 +258,7 @@
     },
     //dump data
     debug: function() {
-      if (FBAPI.enableDebugging) {
-        debug.apply(this, arguments)
-      }
+      debug.apply(this, arguments)
     },
     
     ////// auth functions ///////
