@@ -100,12 +100,12 @@
       //and defer execution to keep async scripts executing in order
       defer: false
     },
-    stdout = !isUndefined(console) ? function() { console.log.apply(console, arguments); } : null,
+    stdout = window['console'] ? function() { console.log.apply(console, arguments); } : function() {},
     debug = function() {
       return debug_array(arguments);
     },
     debug_array = function(arr) {
-      if (isFunction(stdout)) {
+      if (stdout) {
         stdout.apply(FBAPI, arr);
       }
       return FBAPI;
@@ -251,14 +251,19 @@
     //access the Facebook API safely
     ready: sdkReady,
     $: sdkReady,
+    enableDebugging = false,
     //set the callback that gets all debug info
     stdout: function(callback) {
-      if (isFunction(callback)) {
+      if (callback) {
         stdout = callback;
       }
     },
     //dump data
-    debug: debug,
+    debug: function() {
+      if (this.enableDebugging) {
+        debug.apply(this, arguments)
+      }
+    },
     
     ////// auth functions ///////
     
