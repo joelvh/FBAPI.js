@@ -251,7 +251,7 @@
     //access the Facebook API safely
     ready: sdkReady,
     $: sdkReady,
-    enableDebugging = false,
+    enableDebugging: false,
     //set the callback that gets all debug info
     stdout: function(callback) {
       stdout = callback;
