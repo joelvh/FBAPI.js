@@ -217,18 +217,21 @@
         //initialize Facebook Javascript SDK
         FB.init(options);
         
-        //loop through callbacks there were queued 
-        //before Facebook Javascript SDK was loaded
-        while (sdkReadyQueue.length) {
-          sdkReadyQueue.shift()(FB);
-        }
-        
         sdkLoaded = true;
-
+        
         //fire callback and pass session data if there is any
-        if (callback) {
-          FBAPI.getLoginStatus(callback);
-        }
+        FBAPI.getLoginStatus(function() {
+          
+          //loop through callbacks that were queued 
+          //before Facebook Javascript SDK was loaded
+          while (sdkReadyQueue.length) {
+            sdkReadyQueue.shift()(FB);
+          }
+
+          if (callback) {
+            callback.apply(this, arguments);
+          }
+        });
       }
       
       //Facebook's SDK requires <div id="fb-root"></div> before loading
